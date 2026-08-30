@@ -6,6 +6,11 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound NumPy below 2.5 so Python 3.11-targeted mypy checks do not parse Python 3.12-only NumPy stubs.
+- Updated GitHub's checkout and Python setup actions to their Node.js 24 releases.
+
 ## [0.1.0] - 2026-08-30
 
 ### Added

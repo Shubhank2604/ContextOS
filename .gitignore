@@ -11,7 +11,7 @@ build/
 dist/
 
 # Virtual environments and secrets
-.venv/
+.venv*/
 venv/
 .env
 .env.*
