@@ -32,3 +32,12 @@ def test_invalid_policy_fails_with_typed_error(
 def test_effective_budget_reserves_output_tokens() -> None:
     policy = OptimizationPolicy(max_input_tokens=100, reserve_output_tokens=25)
     assert policy.effective_budget == 75
+    assert policy.semantic_dedup_threshold == 0.92
+    assert policy.semantic_relevance_enabled is True
+
+
+@pytest.mark.parametrize("threshold", [-0.01, 1.01])
+def test_semantic_threshold_must_be_normalized(threshold: float) -> None:
+    policy = OptimizationPolicy(max_input_tokens=100, semantic_dedup_threshold=threshold)
+    with pytest.raises(InvalidOptimizationPolicy, match="between 0 and 1"):
+        policy.validate_static()

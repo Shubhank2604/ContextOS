@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Configurable semantic deduplication threshold with a conservative default of `0.92`.
+- Deterministic and optional sentence-transformer embedding providers with normalized-content caching.
+- Mandatory-aware exact and semantic deduplication with numeric, date, identifier, path, URL, code, and negation safety guards.
+- Provider-driven relevance and novelty scoring.
+- Labeled deduplication fixture metrics and `contextos benchmark dedup`.
+
 ## [0.2.0] - 2026-08-30
 
 ### Added

@@ -83,6 +83,23 @@ def test_cli_quick_benchmark_runs_end_to_end() -> None:
     assert len(report["results"]) == 3
 
 
+def test_cli_deduplication_benchmark_runs_end_to_end() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "dedup",
+            "--input",
+            "benchmarks/datasets/deduplication_cases.json",
+        ],
+    )
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["case_count"] == 10
+    assert report["false_positive"] == 0
+    assert report["f1"] == 1.0
+
+
 def test_cli_rejects_unknown_benchmark_profile() -> None:
     result = runner.invoke(app, ["benchmark", "--profile", "standard"])
     assert result.exit_code == 2

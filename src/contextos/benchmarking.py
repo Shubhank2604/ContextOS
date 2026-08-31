@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
+
+from pydantic import TypeAdapter
 
 from contextos.baselines import (
     BaselineStrategy,
@@ -12,6 +16,12 @@ from contextos.baselines import (
     SlidingWindowBaseline,
 )
 from contextos.config import OptimizationPolicy
+from contextos.dedup.metrics import (
+    DeduplicationCase,
+    DeduplicationMetrics,
+    evaluate_deduplication_cases,
+)
+from contextos.embeddings import DeterministicEmbeddingProvider
 from contextos.errors import ContextBudgetOverflow
 from contextos.models import ContextItem, ContextType
 from contextos.tokenization import Tokenizer
@@ -85,3 +95,18 @@ def run_quick_baseline_benchmark(tokenizer: Tokenizer) -> dict[str, Any]:
                 }
             )
     return {"profile": "quick", "case_count": 1, "results": results}
+
+
+def run_deduplication_benchmark(
+    fixture_path: Path,
+    *,
+    threshold: float = 0.92,
+) -> DeduplicationMetrics:
+    """Evaluate Phase 3A deduplication against a labeled JSON fixture."""
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+    cases = TypeAdapter(list[DeduplicationCase]).validate_python(payload)
+    return evaluate_deduplication_cases(
+        cases,
+        provider=DeterministicEmbeddingProvider(),
+        threshold=threshold,
+    )

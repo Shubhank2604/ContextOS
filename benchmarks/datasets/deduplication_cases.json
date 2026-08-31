@@ -1,0 +1,72 @@
+[
+  {
+    "id": "exact-unicode",
+    "left": "Café deployment approved.",
+    "right": "Café deployment approved.",
+    "context_type": "decision",
+    "should_deduplicate": true
+  },
+  {
+    "id": "word-order-paraphrase",
+    "left": "Deploy the API after tests pass.",
+    "right": "After tests pass deploy the API.",
+    "context_type": "plan",
+    "should_deduplicate": true
+  },
+  {
+    "id": "minor-paraphrase",
+    "left": "Deploy the API after tests pass.",
+    "right": "Deploy the API after all tests pass.",
+    "context_type": "plan",
+    "should_deduplicate": true
+  },
+  {
+    "id": "changed-number",
+    "left": "Set the timeout to 10 seconds.",
+    "right": "Set the timeout to 100 seconds.",
+    "context_type": "decision",
+    "should_deduplicate": false
+  },
+  {
+    "id": "changed-date",
+    "left": "Release on 2026-09-01 after approval.",
+    "right": "Release on 2026-09-10 after approval.",
+    "context_type": "plan",
+    "should_deduplicate": false
+  },
+  {
+    "id": "negation",
+    "left": "The feature is enabled.",
+    "right": "The feature is not enabled.",
+    "context_type": "decision",
+    "should_deduplicate": false
+  },
+  {
+    "id": "changed-path",
+    "left": "Load settings from /etc/contextos/dev.json.",
+    "right": "Load settings from /etc/contextos/prod.json.",
+    "context_type": "task_state",
+    "should_deduplicate": false
+  },
+  {
+    "id": "changed-id",
+    "left": "Investigate ticket BUG-1042 now.",
+    "right": "Investigate ticket BUG-1402 now.",
+    "context_type": "task_state",
+    "should_deduplicate": false
+  },
+  {
+    "id": "changed-code",
+    "left": "timeout = 10",
+    "right": "timeout = 100",
+    "context_type": "code",
+    "should_deduplicate": false
+  },
+  {
+    "id": "unrelated",
+    "left": "Authentication uses stateless tokens.",
+    "right": "The analytics database needs a migration.",
+    "context_type": "decision",
+    "should_deduplicate": false
+  }
+]

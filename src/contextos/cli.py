@@ -17,7 +17,7 @@ from contextos.baselines import (
     LastNTokensBaseline,
     SlidingWindowBaseline,
 )
-from contextos.benchmarking import run_quick_baseline_benchmark
+from contextos.benchmarking import run_deduplication_benchmark, run_quick_baseline_benchmark
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
 from contextos.models import ContextItem
@@ -126,6 +126,23 @@ def benchmark(
         raise typer.Exit(code=2)
     report = run_quick_baseline_benchmark(TiktokenTokenizer())
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
+
+
+@benchmark_app.command("dedup")
+def benchmark_deduplication(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ] = Path("benchmarks/datasets/deduplication_cases.json"),
+    threshold: Annotated[float, typer.Option("--threshold", min=0.0, max=1.0)] = 0.92,
+) -> None:
+    """Measure deduplication precision, recall, F1, and false positives."""
+    try:
+        metrics = run_deduplication_benchmark(input_path, threshold=threshold)
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        typer.echo(f"Deduplication benchmark failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(metrics.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

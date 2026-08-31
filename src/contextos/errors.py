@@ -9,6 +9,14 @@ class TokenizerError(ContextOSError):
     """Raised when text cannot be tokenized safely."""
 
 
+class EmbeddingProviderError(ContextOSError):
+    """Raised when an embedding provider is unavailable or fails."""
+
+
+class InvalidEmbeddingOutput(EmbeddingProviderError):
+    """Raised when a provider returns malformed or unsafe embeddings."""
+
+
 class DuplicateContextItemError(ContextOSError):
     """Raised when a collection contains duplicate context item IDs."""
 

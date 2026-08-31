@@ -1,6 +1,8 @@
-"""Tests for the deterministic quick benchmark harness."""
+"""Tests for deterministic benchmark harnesses."""
 
-from contextos.benchmarking import run_quick_baseline_benchmark
+from pathlib import Path
+
+from contextos.benchmarking import run_deduplication_benchmark, run_quick_baseline_benchmark
 from contextos.tokenization import TiktokenTokenizer
 
 
@@ -16,3 +18,12 @@ def test_quick_benchmark_is_deterministic() -> None:
         "sliding_window",
     ]
     assert first["results"][0]["status"] == "overflow"
+
+
+def test_deduplication_benchmark_reports_labeled_metrics() -> None:
+    metrics = run_deduplication_benchmark(Path("benchmarks/datasets/deduplication_cases.json"))
+    assert metrics.case_count == 10
+    assert metrics.false_positive == 0
+    assert metrics.precision == 1.0
+    assert metrics.recall == 1.0
+    assert metrics.f1 == 1.0

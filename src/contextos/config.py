@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from contextos.errors import InvalidOptimizationPolicy
 
 DEFAULT_TIKTOKEN_ENCODING = "cl100k_base"
+DEFAULT_SENTENCE_TRANSFORMER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 class OptimizationPolicy(BaseModel):
@@ -18,6 +19,8 @@ class OptimizationPolicy(BaseModel):
 
     max_input_tokens: int
     reserve_output_tokens: int = 0
+    semantic_dedup_threshold: float = 0.92
+    semantic_relevance_enabled: bool = True
 
     @model_validator(mode="before")
     @classmethod
@@ -44,6 +47,8 @@ class OptimizationPolicy(BaseModel):
             raise InvalidOptimizationPolicy(
                 "max_input_tokens - reserve_output_tokens must be positive"
             )
+        if not 0.0 <= self.semantic_dedup_threshold <= 1.0:
+            raise InvalidOptimizationPolicy("semantic_dedup_threshold must be between 0 and 1")
 
     @property
     def effective_budget(self) -> int:

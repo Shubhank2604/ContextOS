@@ -13,3 +13,9 @@ All strategies accept an `OptimizationPolicy`, tokenize isolated copies of input
 - Sliding Window uses the newest `updated_at` as its deterministic reference time, removes items outside the configured window, and applies Last-N whole-item selection if the window exceeds budget.
 
 Mandatory retention is intentionally absent from these naive comparison strategies and is identified by a trace warning. Hard retention belongs to the ContextOS optimizer pipeline introduced in later milestones.
+
+## Semantic selection boundary
+
+Embedding providers expose one batch-oriented interface and remain independent from the optimizer. Tests and deterministic local measurements use a stable feature-hash provider; the optional sentence-transformer implementation loads its configured model lazily. Embeddings are cached by the SHA-256 hash of Unicode-normalized content.
+
+Exact deduplication runs before embeddings and may remove only optional items. Mandatory duplicates always survive. Semantic deduplication is scoped to matching context types and uses a configurable cosine threshold, defaulting to `0.92`. Similarity alone is insufficient: differing numbers, dates, identifiers, URLs, paths, code, or negation force both items to survive.
