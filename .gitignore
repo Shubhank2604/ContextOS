@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.pytest-tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -21,6 +22,7 @@ venv/
 .idea/
 .vscode/
 .DS_Store
+.gitignore
 Thumbs.db
 
 # Generated runtime and benchmark data

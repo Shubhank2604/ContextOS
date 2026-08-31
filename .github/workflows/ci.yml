@@ -8,6 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
@@ -23,3 +24,4 @@ jobs:
       - run: ruff format --check .
       - run: mypy
       - run: pytest
+      - run: contextos benchmark --profile quick

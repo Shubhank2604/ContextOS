@@ -1,0 +1,50 @@
+[
+  {
+    "id": "decision-1",
+    "content": "Authentication must remain stateless.",
+    "type": "decision",
+    "source": "architecture-review",
+    "created_at": "2026-01-01T10:00:00Z",
+    "updated_at": "2026-01-01T10:00:00Z",
+    "importance": 0.95,
+    "mandatory": false,
+    "compressible": true,
+    "evictable": true,
+    "lifecycle_tier": "warm",
+    "token_count": null,
+    "semantic_hash": null,
+    "metadata": {}
+  },
+  {
+    "id": "tool-1",
+    "content": "Formatting and lint checks passed.",
+    "type": "tool_output",
+    "source": "ci",
+    "created_at": "2026-01-02T10:00:00Z",
+    "updated_at": "2026-01-02T10:00:00Z",
+    "importance": 0.2,
+    "mandatory": false,
+    "compressible": true,
+    "evictable": true,
+    "lifecycle_tier": "hot",
+    "token_count": null,
+    "semantic_hash": null,
+    "metadata": {}
+  },
+  {
+    "id": "task-1",
+    "content": "Fix the authentication timeout.",
+    "type": "user_message",
+    "source": "user",
+    "created_at": "2026-01-03T10:00:00Z",
+    "updated_at": "2026-01-03T10:00:00Z",
+    "importance": 1.0,
+    "mandatory": true,
+    "compressible": false,
+    "evictable": false,
+    "lifecycle_tier": "hot",
+    "token_count": null,
+    "semantic_hash": null,
+    "metadata": {}
+  }
+]

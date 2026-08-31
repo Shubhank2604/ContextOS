@@ -5,13 +5,14 @@ from __future__ import annotations
 import tiktoken
 from tiktoken import Encoding
 
+from contextos.config import DEFAULT_TIKTOKEN_ENCODING
 from contextos.errors import TokenizerError
 
 
 class TiktokenTokenizer:
     """Deterministic token counter for a configured tiktoken encoding."""
 
-    def __init__(self, encoding_name: str = "cl100k_base") -> None:
+    def __init__(self, encoding_name: str = DEFAULT_TIKTOKEN_ENCODING) -> None:
         self.encoding_name = encoding_name
         try:
             self._encoding: Encoding = tiktoken.get_encoding(encoding_name)

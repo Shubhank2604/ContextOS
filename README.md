@@ -1,8 +1,8 @@
 # ContextOS
 
-ContextOS is a model-agnostic Python runtime for constructing an LLM's next input context under a fixed token budget. The project is currently at the repository-foundation milestone; benchmark claims will be added only when reproducible result artifacts exist.
+ContextOS is a model-agnostic Python runtime for constructing an LLM's next input context under a fixed token budget. Version 0.2.0 adds deterministic Full Context, Last-N, and Sliding Window baselines with complete decision traces. Benchmark claims will be added only when reproducible result artifacts exist.
 
-The authoritative requirements are in [`MASTER_BUILD_SPEC.md`](MASTER_BUILD_SPEC.md), and current implementation progress is recorded in [`PROJECT_STATUS.md`](PROJECT_STATUS.md).
+The detailed build specification and live project status are maintained locally during development. Checked-in version changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Development setup
 
@@ -17,9 +17,20 @@ pytest
 contextos --help
 ```
 
-## Current scope
+## Baseline CLI
 
-Version 0.1.0 establishes validated context models, configurable token counting, an in-memory store, CLI scaffolding, tests, and CI. Later milestones add optimization behavior and benchmarks in the order specified by the master build specification.
+```bash
+contextos optimize \
+  --input examples/data/coding_context.json \
+  --task "Fix authentication timeout" \
+  --budget 100 \
+  --strategy last-n \
+  --trace-json out/trace.json
+
+contextos benchmark --profile quick
+```
+
+The Last-N baseline retains the newest contiguous suffix of whole items that fits. Sliding Window first removes items older than its configured time window, then applies the same whole-item budget behavior. These naive baselines deliberately do not enforce typed mandatory retention; that limitation is emitted in their traces and allows later ContextOS policies to be compared against untyped recency baselines.
 
 ## License
 
