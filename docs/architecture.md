@@ -42,3 +42,11 @@ Application-provided importance always wins. If it is omitted, the context model
 | Task state | 0.90 | 0.95 |
 
 Dependency edges are application supplied and retained with their relation type. Score propagation treats an edge as a traversable connection in both directions, multiplies weights along a path, takes the strongest reachable neighbor score, stops at the configured depth (default `2`), and tracks visited IDs to terminate cycles. `SUPERSEDES` and `CONTRADICTS` remain explicit graph evidence; scoring does not silently delete either endpoint.
+
+## Allocation boundary
+
+Mandatory tokens are reserved before optional allocation. Static policy errors, mandatory overflow, and context-dependent class-minimum infeasibility are separate typed failures. Class minima are soft floors applied only to optional types present after deduplication; whole-item granularity can leave a floor unmet, which is recorded rather than silently treated as a policy error.
+
+The allocator performs a stable per-type floor pass followed by a global value-density pass. Class maxima apply to raw selections and planned compressed representations. Items that fail raw selection are ranked separately for compression, and the resulting `AllocationPlan` partitions every optional candidate into exactly one outcome: direct selection, a reserved `CompressionRequest`, or rejection with a reason.
+
+The allocator never invokes a compressor. It also never evicts a raw selection to make room for a compressed candidate. This deterministic greedy behavior is intentionally not claimed to be globally optimal. The plan retains the full ranked compression-candidate order so Phase 3D can reuse returned reservations without recomputing or reordering allocator decisions.

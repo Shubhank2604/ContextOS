@@ -1,6 +1,7 @@
 """Public package surface for ContextOS."""
 
 from contextos.baselines import FullContextBaseline, LastNTokensBaseline, SlidingWindowBaseline
+from contextos.budget import AllocationPlan
 from contextos.config import OptimizationPolicy
 from contextos.models import (
     ContextEdge,
@@ -12,6 +13,7 @@ from contextos.models import (
 from contextos.trace import OptimizationTrace, OptimizedContext
 
 __all__ = [
+    "AllocationPlan",
     "ContextEdge",
     "ContextItem",
     "ContextType",

@@ -49,6 +49,8 @@ class OptimizationPolicy(BaseModel):
 
     position_aware_layout: bool = True
     compression_enabled: bool = True
+    compression_target_ratio: float = 0.50
+    minimum_compressed_tokens: int = 64
 
     class_minimum_tokens: dict[ContextType, int] = Field(default_factory=dict)
     class_maximum_tokens: dict[ContextType, int | None] = Field(default_factory=dict)
@@ -75,6 +77,11 @@ class OptimizationPolicy(BaseModel):
             if type(dependency_max_depth) is not int:
                 raise InvalidOptimizationPolicy(
                     "dependency_max_depth must be a non-negative integer"
+                )
+            minimum_compressed_tokens = data.get("minimum_compressed_tokens", 64)
+            if type(minimum_compressed_tokens) is not int:
+                raise InvalidOptimizationPolicy(
+                    "minimum_compressed_tokens must be a positive integer"
                 )
             for field_name, allow_none in (
                 ("class_minimum_tokens", False),
@@ -103,6 +110,12 @@ class OptimizationPolicy(BaseModel):
             )
         if not 0.0 <= self.semantic_dedup_threshold <= 1.0:
             raise InvalidOptimizationPolicy("semantic_dedup_threshold must be between 0 and 1")
+        if not math.isfinite(self.compression_target_ratio) or not (
+            0.0 < self.compression_target_ratio < 1.0
+        ):
+            raise InvalidOptimizationPolicy("compression_target_ratio must be between 0 and 1")
+        if self.minimum_compressed_tokens <= 0:
+            raise InvalidOptimizationPolicy("minimum_compressed_tokens must be positive")
         weights = self.raw_weights
         if any(not math.isfinite(weight) or weight < 0 for weight in weights.values()):
             raise InvalidOptimizationPolicy("optimization weights must be non-negative")

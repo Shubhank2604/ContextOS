@@ -16,6 +16,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Complete serializable optimization-policy fields, normalized weights, and quality/balanced/economy presets.
 - Deterministic importance, exponential-recency, type-priority, dependency-propagation, and composite scoring.
 - Typed dependency edges with bounded cycle-safe traversal and explicit unknown-reference failures.
+- Contextual mandatory/minimum budget validation with distinct typed failures.
+- Deterministic class-floor, class-maximum, value-density, and compression-reservation allocation plans.
+- Explicit allocator/compressor handoff models with complete candidate partition and budget invariants.
 
 ## [0.2.0] - 2026-08-30
 

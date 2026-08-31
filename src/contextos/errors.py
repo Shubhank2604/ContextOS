@@ -37,6 +37,34 @@ class InvalidOptimizationPolicy(ContextOSError):
     """Raised before work begins when a token-budget policy is invalid."""
 
 
+class MandatoryContextOverflow(ContextOSError):
+    """Raised when mandatory context alone exceeds the effective budget."""
+
+    def __init__(self, *, mandatory_tokens: int, effective_budget: int) -> None:
+        self.mandatory_tokens = mandatory_tokens
+        self.effective_budget = effective_budget
+        super().__init__(
+            f"mandatory context requires {mandatory_tokens} tokens but the effective budget is "
+            f"{effective_budget}"
+        )
+
+
+class ContextualBudgetInfeasible(ContextOSError):
+    """Raised when applicable optional class minima exceed optional budget."""
+
+    def __init__(self, *, applicable_minima: int, optional_budget: int) -> None:
+        self.applicable_minima = applicable_minima
+        self.optional_budget = optional_budget
+        super().__init__(
+            f"applicable class minima require {applicable_minima} tokens but the optional budget "
+            f"is {optional_budget}"
+        )
+
+
+class AllocationError(ContextOSError):
+    """Raised when tokenized allocation inputs violate the allocation contract."""
+
+
 class ContextBudgetOverflow(ContextOSError):
     """Raised when a strategy cannot represent its result within budget."""
 

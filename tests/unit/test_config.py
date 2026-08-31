@@ -70,6 +70,10 @@ def test_policy_contains_complete_runtime_configuration_and_serializes() -> None
         {"recency_half_life_seconds": 0.0},
         {"recency_half_life_seconds": float("nan")},
         {"dependency_max_depth": -1},
+        {"compression_target_ratio": 0.0},
+        {"compression_target_ratio": 1.0},
+        {"compression_target_ratio": float("nan")},
+        {"minimum_compressed_tokens": 0},
         {"class_minimum_tokens": {ContextType.CODE: -1}},
         {"class_maximum_tokens": {ContextType.CODE: -1}},
         {
@@ -120,6 +124,7 @@ def test_profiles_are_deterministic_presets_and_allow_overrides() -> None:
         {"dependency_max_depth": True},
         {"class_minimum_tokens": {ContextType.CODE: True}},
         {"class_maximum_tokens": {ContextType.CODE: 1.5}},
+        {"minimum_compressed_tokens": True},
     ],
 )
 def test_policy_rejects_coercible_integer_configuration(changes: dict[str, object]) -> None:
