@@ -10,17 +10,18 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
-from contextos import __version__
+from contextos import ContextOptimizer, __version__
 from contextos.baselines import (
     BaselineStrategy,
     FullContextBaseline,
     LastNTokensBaseline,
     SlidingWindowBaseline,
 )
-from contextos.benchmarking import run_deduplication_benchmark, run_quick_baseline_benchmark
+from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
-from contextos.models import ContextItem
+from contextos.models import ContextEdge, ContextItem
+from contextos.store import SQLiteContextStore
 from contextos.tokenization import TiktokenTokenizer
 
 app = typer.Typer(
@@ -33,11 +34,14 @@ benchmark_app = typer.Typer(
     invoke_without_command=True,
 )
 app.add_typer(benchmark_app, name="benchmark")
+store_app = typer.Typer(help="Inspect durable ContextOS stores.")
+app.add_typer(store_app, name="store")
 
 
 class BaselineName(StrEnum):
     """Baseline strategies currently available through the CLI."""
 
+    CONTEXTOS = "contextos"
     FULL = "full"
     LAST_N = "last-n"
     SLIDING_WINDOW = "sliding-window"
@@ -54,12 +58,18 @@ def version() -> None:
     typer.echo(__version__)
 
 
-def _load_items(input_path: Path) -> list[ContextItem]:
+def _load_input(input_path: Path) -> tuple[list[ContextItem], list[ContextEdge]]:
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     raw_items = payload.get("items") if isinstance(payload, dict) else payload
     if not isinstance(raw_items, list):
         raise ValueError("input JSON must be a list or an object containing an 'items' list")
-    return [ContextItem.model_validate(value) for value in raw_items]
+    raw_edges = payload.get("edges", []) if isinstance(payload, dict) else []
+    if not isinstance(raw_edges, list):
+        raise ValueError("input JSON 'edges' must be a list")
+    return (
+        [ContextItem.model_validate(value) for value in raw_items],
+        [ContextEdge.model_validate(value) for value in raw_edges],
+    )
 
 
 @app.command()
@@ -69,33 +79,38 @@ def optimize(
         typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
     ],
     budget: Annotated[int, typer.Option("--budget", min=1)],
-    strategy: Annotated[BaselineName, typer.Option("--strategy")] = BaselineName.FULL,
+    strategy: Annotated[BaselineName, typer.Option("--strategy")] = BaselineName.CONTEXTOS,
     reserve_output_tokens: Annotated[int, typer.Option("--reserve-output-tokens", min=0)] = 0,
     task: Annotated[str, typer.Option("--task")] = "",
     window_seconds: Annotated[int, typer.Option("--window-seconds", min=1)] = 3600,
     trace_json: Annotated[Path | None, typer.Option("--trace-json")] = None,
 ) -> None:
-    """Construct context with a deterministic baseline strategy."""
+    """Construct context with ContextOS or a deterministic baseline."""
     try:
-        items = _load_items(input_path)
+        items, edges = _load_input(input_path)
         policy = OptimizationPolicy(
             max_input_tokens=budget,
             reserve_output_tokens=reserve_output_tokens,
         )
         tokenizer = TiktokenTokenizer()
-        baseline: BaselineStrategy
-        if strategy is BaselineName.FULL:
-            baseline = FullContextBaseline()
-        elif strategy is BaselineName.LAST_N:
-            baseline = LastNTokensBaseline()
+        if strategy is BaselineName.CONTEXTOS:
+            result = ContextOptimizer(tokenizer=tokenizer, edges=edges).optimize(
+                task, items, policy
+            )
         else:
-            baseline = SlidingWindowBaseline(window_seconds=window_seconds)
-        result = baseline.optimize(
-            task=task,
-            items=items,
-            policy=policy,
-            tokenizer=tokenizer,
-        )
+            baseline: BaselineStrategy
+            if strategy is BaselineName.FULL:
+                baseline = FullContextBaseline()
+            elif strategy is BaselineName.LAST_N:
+                baseline = LastNTokensBaseline()
+            else:
+                baseline = SlidingWindowBaseline(window_seconds=window_seconds)
+            result = baseline.optimize(
+                task=task,
+                items=items,
+                policy=policy,
+                tokenizer=tokenizer,
+            )
         if trace_json is not None:
             trace_json.parent.mkdir(parents=True, exist_ok=True)
             trace_json.write_text(result.trace.model_dump_json(indent=2), encoding="utf-8")
@@ -124,7 +139,7 @@ def benchmark(
     if profile != "quick":
         typer.echo("Benchmark failed: Milestone 1 supports only the 'quick' profile", err=True)
         raise typer.Exit(code=2)
-    report = run_quick_baseline_benchmark(TiktokenTokenizer())
+    report = run_quick_benchmark(TiktokenTokenizer())
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
 
 
@@ -143,6 +158,79 @@ def benchmark_deduplication(
         typer.echo(f"Deduplication benchmark failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(metrics.model_dump_json(indent=2))
+
+
+@app.command()
+def inspect(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ],
+) -> None:
+    """Inspect input composition without running optimization."""
+    try:
+        items, edges = _load_input(input_path)
+        tokenizer = TiktokenTokenizer()
+        by_type: dict[str, int] = {}
+        for item in items:
+            by_type[item.type.value] = by_type.get(item.type.value, 0) + 1
+        report = {
+            "item_count": len(items),
+            "edge_count": len(edges),
+            "mandatory_count": sum(item.mandatory for item in items),
+            "token_count": sum(tokenizer.count_tokens(item.content) for item in items),
+            "items_by_type": dict(sorted(by_type.items())),
+        }
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        typer.echo(f"Inspection failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
+
+
+@benchmark_app.command("compare")
+def benchmark_compare(
+    left: Annotated[Path, typer.Option("--left", exists=True, dir_okay=False)],
+    right: Annotated[Path, typer.Option("--right", exists=True, dir_okay=False)],
+) -> None:
+    """Compare the raw result counts from two benchmark reports."""
+    try:
+        left_report = json.loads(left.read_text(encoding="utf-8"))
+        right_report = json.loads(right.read_text(encoding="utf-8"))
+        comparison = {
+            "left_result_count": len(left_report.get("results", [])),
+            "right_result_count": len(right_report.get("results", [])),
+        }
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        typer.echo(f"Benchmark comparison failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(json.dumps(comparison, indent=2, sort_keys=True))
+
+
+@store_app.command("stats")
+def store_stats(
+    database: Annotated[Path, typer.Option("--database", exists=True, dir_okay=False)],
+) -> None:
+    """Print deterministic item, edge, type, and tier counts for a SQLite store."""
+    try:
+        with SQLiteContextStore(database) as store:
+            items = store.list_items()
+            edges = store.load_dependencies()
+        report = {
+            "item_count": len(items),
+            "edge_count": len(edges),
+            "items_by_type": {
+                context_type: sum(item.type.value == context_type for item in items)
+                for context_type in sorted({item.type.value for item in items})
+            },
+            "items_by_tier": {
+                tier: sum(item.lifecycle_tier.value == tier for item in items)
+                for tier in sorted({item.lifecycle_tier.value for item in items})
+            },
+        }
+    except (ContextOSError, OSError, ValueError) as exc:
+        typer.echo(f"Store inspection failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -13,6 +13,10 @@ class EmbeddingProviderError(ContextOSError):
     """Raised when an embedding provider is unavailable or fails."""
 
 
+class LLMProviderError(ContextOSError):
+    """Raised when an optional language-model provider is unavailable or fails."""
+
+
 class InvalidEmbeddingOutput(EmbeddingProviderError):
     """Raised when a provider returns malformed or unsafe embeddings."""
 
@@ -31,6 +35,18 @@ class DuplicateContextItemError(ContextOSError):
 
 class ContextItemNotFoundError(ContextOSError):
     """Raised when a requested context item is not present in a store."""
+
+
+class CorruptedStoreError(ContextOSError):
+    """Raised when persisted data cannot be opened or decoded safely."""
+
+
+class StoreMigrationError(ContextOSError):
+    """Raised when a store schema cannot be migrated by this runtime."""
+
+
+class LifecycleError(ContextOSError):
+    """Raised when lifecycle instructions or timestamps are invalid."""
 
 
 class InvalidOptimizationPolicy(ContextOSError):
@@ -63,6 +79,10 @@ class ContextualBudgetInfeasible(ContextOSError):
 
 class AllocationError(ContextOSError):
     """Raised when tokenized allocation inputs violate the allocation contract."""
+
+
+class CompressionError(ContextOSError):
+    """Raised when a compressor violates the compression contract."""
 
 
 class ContextBudgetOverflow(ContextOSError):

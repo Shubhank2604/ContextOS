@@ -10,12 +10,14 @@ from contextos.models import (
     DependencyRelation,
     LifecycleTier,
 )
+from contextos.optimizer import ContextOptimizer
 from contextos.trace import OptimizationTrace, OptimizedContext
 
 __all__ = [
     "AllocationPlan",
     "ContextEdge",
     "ContextItem",
+    "ContextOptimizer",
     "ContextType",
     "DependencyRelation",
     "FullContextBaseline",
@@ -27,4 +29,4 @@ __all__ = [
     "SlidingWindowBaseline",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

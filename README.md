@@ -1,6 +1,6 @@
 # ContextOS
 
-ContextOS is a model-agnostic Python runtime for constructing an LLM's next input context under a fixed token budget. Version 0.2.0 adds deterministic Full Context, Last-N, and Sliding Window baselines with complete decision traces. Benchmark claims will be added only when reproducible result artifacts exist.
+ContextOS is a model-agnostic Python runtime for constructing an LLM's next input context under a fixed token budget. Version 0.3.0 delivers the integrated runtime: safe deduplication, multi-factor scoring, dependency propagation, deterministic allocation, guarded compression, position-aware layout, complete traces, and SQLite persistence. Benchmark claims will be added only when reproducible result artifacts exist.
 
 The detailed build specification and live project status are maintained locally during development. Checked-in version changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -17,20 +17,37 @@ pytest
 contextos --help
 ```
 
-## Baseline CLI
+## Python SDK
+
+```python
+from contextos import ContextItem, ContextOptimizer, ContextType, OptimizationPolicy
+
+optimizer = ContextOptimizer()
+result = optimizer.optimize(
+    "Fix authentication timeout",
+    items,
+    OptimizationPolicy.balanced(max_input_tokens=8_000, reserve_output_tokens=1_000),
+)
+```
+
+`ContextOptimizer.optimize(task, items, policy)` is the sole authority for the final input budget. Inputs are copied; caller-owned items are not mutated.
+
+## CLI
 
 ```bash
 contextos optimize \
   --input examples/data/coding_context.json \
   --task "Fix authentication timeout" \
   --budget 100 \
-  --strategy last-n \
+  --strategy contextos \
   --trace-json out/trace.json
 
 contextos benchmark --profile quick
+contextos inspect --input examples/data/coding_context.json
+contextos store stats --database out/contextos.sqlite
 ```
 
-The Last-N baseline retains the newest contiguous suffix of whole items that fits. Sliding Window first removes items older than its configured time window, then applies the same whole-item budget behavior. These naive baselines deliberately do not enforce typed mandatory retention; that limitation is emitted in their traces and allows later ContextOS policies to be compared against untyped recency baselines.
+Full Context, Last-N, and Sliding Window remain available with `--strategy` for controlled comparisons. The naive baselines deliberately do not enforce typed mandatory retention; that limitation is emitted in their traces.
 
 ## License
 

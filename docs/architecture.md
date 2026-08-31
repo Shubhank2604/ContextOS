@@ -12,7 +12,7 @@ All strategies accept an `OptimizationPolicy`, tokenize isolated copies of input
 - Last-N ranks by `updated_at`, then `created_at`, then item ID, and retains the newest contiguous suffix that fits while preserving original order in the output.
 - Sliding Window uses the newest `updated_at` as its deterministic reference time, removes items outside the configured window, and applies Last-N whole-item selection if the window exceeds budget.
 
-Mandatory retention is intentionally absent from these naive comparison strategies and is identified by a trace warning. Hard retention belongs to the ContextOS optimizer pipeline introduced in later milestones.
+Mandatory retention is intentionally absent from these naive comparison strategies and is identified by a trace warning. Hard retention belongs to the integrated ContextOS optimizer pipeline.
 
 ## Semantic selection boundary
 
@@ -49,4 +49,16 @@ Mandatory tokens are reserved before optional allocation. Static policy errors, 
 
 The allocator performs a stable per-type floor pass followed by a global value-density pass. Class maxima apply to raw selections and planned compressed representations. Items that fail raw selection are ranked separately for compression, and the resulting `AllocationPlan` partitions every optional candidate into exactly one outcome: direct selection, a reserved `CompressionRequest`, or rejection with a reason.
 
-The allocator never invokes a compressor. It also never evicts a raw selection to make room for a compressed candidate. This deterministic greedy behavior is intentionally not claimed to be globally optimal. The plan retains the full ranked compression-candidate order so Phase 3D can reuse returned reservations without recomputing or reordering allocator decisions.
+The allocator never invokes a compressor. It also never evicts a raw selection to make room for a compressed candidate. This deterministic greedy behavior is intentionally not claimed to be globally optimal. The plan retains the full ranked compression-candidate order so the compression stage can reuse returned reservations without recomputing or reordering allocator decisions.
+
+## Compression and layout boundary
+
+Compression operates on one item at a time and returns source provenance, strategy, original and compressed token counts, and an explicit failure reason. Extractive compression retains exact source sentences in source order. Tool-output compression retains exact critical/task/boundary lines. Optional LLM summarization is disabled by default and cannot process protected content. A failed or under-target attempt releases its unused reservation for later ranked candidates.
+
+Layout is independent from selection. Original-order and relevance-descending layouts serve as controls. Position-aware layout places mandatory system information first, high-utility evidence early, and recent task state or user messages near the end. Layout never modifies item content, so internal code order is preserved.
+
+## Persistence and integrated runtime boundary
+
+The in-memory and SQLite stores share item, time/type/tier query, edge, tier-update, and explicit-delete operations. SQLite records its schema version and migrates version-zero stores to the current schema. Lifecycle transitions are deterministic, accept explicit application overrides, and never automatically delete archived records.
+
+`ContextOptimizer.optimize(task, items, policy)` owns the complete budgeted pipeline. It validates and tokenizes isolated copies, reserves mandatory content, deduplicates, scores, allocates, compresses, lays out, validates invariants, emits a complete trace, and optionally persists items and edges. Provider fallback is visible in trace warnings.

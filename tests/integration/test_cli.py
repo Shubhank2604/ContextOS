@@ -21,7 +21,7 @@ def test_cli_help() -> None:
 def test_cli_version() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert result.stdout.strip() == "0.2.0"
+    assert result.stdout.strip() == "0.3.0"
 
 
 def write_input(path: Path) -> None:
@@ -80,7 +80,29 @@ def test_cli_quick_benchmark_runs_end_to_end() -> None:
     assert result.exit_code == 0
     report = json.loads(result.stdout)
     assert report["profile"] == "quick"
-    assert len(report["results"]) == 3
+    assert len(report["results"]) == 4
+    assert report["results"][-1]["strategy"] == "contextos"
+
+
+def test_cli_contextos_optimize_is_the_default(tmp_path: Path) -> None:
+    input_path = tmp_path / "items.json"
+    write_input(input_path)
+    result = runner.invoke(
+        app,
+        ["optimize", "--input", str(input_path), "--budget", "20", "--task", "fixture"],
+    )
+    assert result.exit_code == 0
+    assert "Strategy: contextos" in result.stdout
+
+
+def test_cli_inspect_runs_without_optimization(tmp_path: Path) -> None:
+    input_path = tmp_path / "items.json"
+    write_input(input_path)
+    result = runner.invoke(app, ["inspect", "--input", str(input_path)])
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["item_count"] == 1
+    assert report["items_by_type"] == {"user_message": 1}
 
 
 def test_cli_deduplication_benchmark_runs_end_to_end() -> None:

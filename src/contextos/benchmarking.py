@@ -24,6 +24,7 @@ from contextos.dedup.metrics import (
 from contextos.embeddings import DeterministicEmbeddingProvider
 from contextos.errors import ContextBudgetOverflow
 from contextos.models import ContextItem, ContextType
+from contextos.optimizer import ContextOptimizer
 from contextos.tokenization import Tokenizer
 
 
@@ -83,6 +84,8 @@ def run_quick_baseline_benchmark(tokenizer: Tokenizer) -> dict[str, Any]:
                     "original_tokens": result.original_token_count,
                     "final_tokens": result.final_token_count,
                     "selected_item_ids": [item.id for item in result.selected_items],
+                    "compressed_count": result.trace.compressed_count,
+                    "warnings": result.trace.warnings,
                 }
             )
         except ContextBudgetOverflow as exc:
@@ -95,6 +98,33 @@ def run_quick_baseline_benchmark(tokenizer: Tokenizer) -> dict[str, Any]:
                 }
             )
     return {"profile": "quick", "case_count": 1, "results": results}
+
+
+def run_quick_benchmark(tokenizer: Tokenizer) -> dict[str, Any]:
+    """Run one fixture through baseline and ContextOS strategies consistently."""
+    report = run_quick_baseline_benchmark(tokenizer)
+    items = _fixture_items()
+    total_tokens = sum(tokenizer.count_tokens(item.content) for item in items)
+    policy = OptimizationPolicy(
+        max_input_tokens=max(total_tokens - 1, 1),
+        reserve_output_tokens=0,
+        minimum_compressed_tokens=1,
+    )
+    result = ContextOptimizer(tokenizer=tokenizer).optimize(
+        "Fix the authentication timeout.", items, policy
+    )
+    report["results"].append(
+        {
+            "strategy": result.trace.strategy,
+            "status": "ok",
+            "original_tokens": result.original_token_count,
+            "final_tokens": result.final_token_count,
+            "selected_item_ids": [item.id for item in result.selected_items],
+            "compressed_count": result.trace.compressed_count,
+            "warnings": result.trace.warnings,
+        }
+    )
+    return report
 
 
 def run_deduplication_benchmark(

@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
 ### Added
 
 - Configurable semantic deduplication threshold with a conservative default of `0.92`.
@@ -19,6 +21,13 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Contextual mandatory/minimum budget validation with distinct typed failures.
 - Deterministic class-floor, class-maximum, value-density, and compression-reservation allocation plans.
 - Explicit allocator/compressor handoff models with complete candidate partition and budget invariants.
+- Safe extractive, tool-output, no-op, and optional LLM-summary compression contracts.
+- Deterministic returned-reservation reuse after failed or under-target compression.
+- Original-order, relevance-descending, and position-aware layout strategies.
+- Versioned SQLite persistence, dependency edges, migrations, and lifecycle transitions.
+- The authoritative integrated `ContextOptimizer` pipeline with complete per-item traces.
+- Public optimizer CLI, input inspection, store statistics, and benchmark comparison commands.
+- ContextOS-Bench schemas, initial deduplication/allocation/regression fixtures, and a quick runner that invokes both baseline and ContextOS strategies.
 
 ## [0.2.0] - 2026-08-30
 

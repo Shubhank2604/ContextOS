@@ -4,4 +4,4 @@ import contextos
 
 
 def test_package_version() -> None:
-    assert contextos.__version__ == "0.2.0"
+    assert contextos.__version__ == "0.3.0"
