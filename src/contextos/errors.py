@@ -17,6 +17,14 @@ class InvalidEmbeddingOutput(EmbeddingProviderError):
     """Raised when a provider returns malformed or unsafe embeddings."""
 
 
+class UnknownDependencyReference(ContextOSError):
+    """Raised when an edge references an item outside the validated collection."""
+
+
+class InvalidScore(ContextOSError):
+    """Raised when a scoring component is missing or outside its contract."""
+
+
 class DuplicateContextItemError(ContextOSError):
     """Raised when a collection contains duplicate context item IDs."""
 

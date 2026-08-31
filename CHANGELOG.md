@@ -13,6 +13,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 - Mandatory-aware exact and semantic deduplication with numeric, date, identifier, path, URL, code, and negation safety guards.
 - Provider-driven relevance and novelty scoring.
 - Labeled deduplication fixture metrics and `contextos benchmark dedup`.
+- Complete serializable optimization-policy fields, normalized weights, and quality/balanced/economy presets.
+- Deterministic importance, exponential-recency, type-priority, dependency-propagation, and composite scoring.
+- Typed dependency edges with bounded cycle-safe traversal and explicit unknown-reference failures.
 
 ## [0.2.0] - 2026-08-30
 

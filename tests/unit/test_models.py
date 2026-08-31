@@ -6,7 +6,14 @@ import pytest
 from pydantic import ValidationError
 
 from contextos.errors import DuplicateContextItemError
-from contextos.models import ContextItem, ContextType, validate_unique_item_ids
+from contextos.models import (
+    DEFAULT_IMPORTANCE_BY_TYPE,
+    ContextEdge,
+    ContextItem,
+    ContextType,
+    DependencyRelation,
+    validate_unique_item_ids,
+)
 
 
 def make_item(**changes: object) -> ContextItem:
@@ -93,3 +100,38 @@ def test_context_collection_ids_must_be_unique() -> None:
 
 def test_context_collection_accepts_unique_ids() -> None:
     validate_unique_item_ids([make_item(), make_item(id="item-2")])
+
+
+@pytest.mark.parametrize("context_type", list(ContextType))
+def test_missing_importance_uses_documented_type_default(context_type: ContextType) -> None:
+    item = make_item(type=context_type)
+    payload = item.model_dump(exclude={"importance"})
+    defaulted = ContextItem.model_validate(payload)
+    assert defaulted.importance == DEFAULT_IMPORTANCE_BY_TYPE[context_type]
+
+
+@pytest.mark.parametrize("relation", list(DependencyRelation))
+def test_context_edge_supports_every_dependency_relation(relation: DependencyRelation) -> None:
+    edge = ContextEdge(source_id="source", target_id="target", relation=relation, weight=0.5)
+    assert edge.relation is relation
+
+
+@pytest.mark.parametrize("weight", [-0.01, 1.01])
+def test_context_edge_weight_must_be_normalized(weight: float) -> None:
+    with pytest.raises(ValidationError):
+        ContextEdge(
+            source_id="source",
+            target_id="target",
+            relation=DependencyRelation.REQUIRES,
+            weight=weight,
+        )
+
+
+def test_context_edge_endpoints_must_not_be_blank() -> None:
+    with pytest.raises(ValidationError, match="endpoint"):
+        ContextEdge(
+            source_id=" ",
+            target_id="target",
+            relation=DependencyRelation.RELATED_TO,
+            weight=1.0,
+        )

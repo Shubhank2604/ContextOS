@@ -2,12 +2,20 @@
 
 from contextos.baselines import FullContextBaseline, LastNTokensBaseline, SlidingWindowBaseline
 from contextos.config import OptimizationPolicy
-from contextos.models import ContextItem, ContextType, LifecycleTier
+from contextos.models import (
+    ContextEdge,
+    ContextItem,
+    ContextType,
+    DependencyRelation,
+    LifecycleTier,
+)
 from contextos.trace import OptimizationTrace, OptimizedContext
 
 __all__ = [
+    "ContextEdge",
     "ContextItem",
     "ContextType",
+    "DependencyRelation",
     "FullContextBaseline",
     "LastNTokensBaseline",
     "LifecycleTier",

@@ -55,3 +55,9 @@ def test_novelty_uses_nearest_optional_neighbor_and_skips_mandatory() -> None:
 
 def test_single_optional_item_is_fully_novel_without_embedding() -> None:
     assert novelty_scores([_item("only")], provider=OrderedProvider([])) == {"only": 1.0}
+
+
+def test_empty_context_has_no_semantic_scores() -> None:
+    provider = OrderedProvider([])
+    assert relevance_scores("task", [], provider=provider) == {}
+    assert novelty_scores([_item("mandatory", mandatory=True)], provider=provider) == {}

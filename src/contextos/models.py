@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -38,6 +38,51 @@ class LifecycleTier(str, Enum):
     ARCHIVED = "archived"
 
 
+class DependencyRelation(str, Enum):
+    """Supported deterministic relationships between context items."""
+
+    REQUIRES = "requires"
+    DERIVED_FROM = "derived_from"
+    SUPERSEDES = "supersedes"
+    CONTRADICTS = "contradicts"
+    RELATED_TO = "related_to"
+
+
+DEFAULT_IMPORTANCE_BY_TYPE: dict[ContextType, float] = {
+    ContextType.SYSTEM_INSTRUCTION: 1.0,
+    ContextType.TOOL_DEFINITION: 0.7,
+    ContextType.USER_MESSAGE: 0.7,
+    ContextType.ASSISTANT_MESSAGE: 0.4,
+    ContextType.TOOL_OUTPUT: 0.4,
+    ContextType.RETRIEVED_DOCUMENT: 0.5,
+    ContextType.MEMORY: 0.5,
+    ContextType.DECISION: 0.8,
+    ContextType.ERROR: 0.8,
+    ContextType.PLAN: 0.6,
+    ContextType.CODE: 0.7,
+    ContextType.TASK_STATE: 0.9,
+}
+
+
+class ContextEdge(BaseModel):
+    """An application-supplied dependency edge between context items."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_id: str
+    target_id: str
+    relation: DependencyRelation
+    weight: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("source_id", "target_id")
+    @classmethod
+    def validate_endpoint(cls, value: str) -> str:
+        """Reject blank edge endpoints."""
+        if not value.strip():
+            raise ValueError("dependency endpoint IDs must not be empty")
+        return value
+
+
 class ContextItem(BaseModel):
     """A typed, validated unit of candidate LLM context."""
 
@@ -51,7 +96,7 @@ class ContextItem(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    importance: float = Field(ge=0.0, le=1.0)
+    importance: float = Field(default=0.5, ge=0.0, le=1.0)
     mandatory: bool = False
     compressible: bool = True
     evictable: bool = True
@@ -62,6 +107,20 @@ class ContextItem(BaseModel):
     semantic_hash: str | None = None
 
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_default_importance(cls, data: object) -> object:
+        """Apply a deterministic type fallback only when importance is omitted."""
+        if isinstance(data, Mapping) and "importance" not in data:
+            values = dict(data)
+            try:
+                context_type = ContextType(values.get("type"))
+            except (TypeError, ValueError):
+                return data
+            values["importance"] = DEFAULT_IMPORTANCE_BY_TYPE[context_type]
+            return values
+        return data
 
     @field_validator("id")
     @classmethod
