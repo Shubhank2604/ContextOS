@@ -53,3 +53,11 @@ Within one LongBench run, all strategies share the exact prepared case IDs, pinn
 Raw predictions include strategy, status, original and constructed context tokens, local and provider prompt tokens, output/cached tokens when exposed, optimizer and provider latency, context reduction, selected chunk IDs, warnings, and model identity. Scoring requires the complete case-by-strategy matrix, never substitutes a missing prediction, and calculates quality retention only against a non-zero successful Full Context score for the same case and metric.
 
 The current offline ContextOS-Bench comparison is diagnostic, not a finalized empirical claim. Newly added simple baselines may outperform the current integrated configuration; those results must remain visible and motivate the Phase 4E ablation study rather than being filtered from reports.
+
+## Phase 4E ablation study
+
+`contextos benchmark ablation` executes full ContextOS plus five single-component variants: without semantic deduplication, recency, dependency scoring, compression, or position-aware layout. Every variant receives the same 50 cases and per-case budget. The artifact records the exact policy override for each strategy and retains raw task score, Critical Information Recall, input tokens, optimizer latency, aggregate bootstrap intervals, and deltas against full ContextOS.
+
+The current deterministic run is diagnostic. Full ContextOS scores `0.68` on annotated-fact recall and `0.52` CIR at a mean `69.84` input tokens. Removing dependency scoring lowers task score to `0.60` while CIR remains `0.52` and mean input falls to `68.56` tokens. The other removals are neutral on task score, CIR, and input tokens in this dataset. Single-run millisecond latency differences are retained raw but are too small and noisy to support a component-value claim.
+
+These neutral results define benchmark sensitivity rather than proving that the components have no value. The presence-based evaluator cannot measure layout effects, and these cases do not materially exercise compression, semantic duplicate removal, or recency-sensitive selection. Accordingly, no component is removed on this evidence alone. Position-aware layout must be judged by the positional provider experiment; the other components require targeted or external cases before a simplification decision.

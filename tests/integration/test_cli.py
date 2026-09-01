@@ -185,6 +185,34 @@ def test_cli_contextos_bench_writes_immutable_artifact(tmp_path: Path) -> None:
     assert len(run.measurements) == 6
 
 
+def test_cli_ablation_writes_all_six_variants(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "ablation",
+            "--output-directory",
+            str(tmp_path),
+            "--case-limit",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    run = BenchmarkRun.model_validate_json(Path(report["artifact"]).read_text(encoding="utf-8"))
+    assert run.strategies == [
+        "contextos_full",
+        "contextos_without_semantic_deduplication",
+        "contextos_without_recency",
+        "contextos_without_dependency_score",
+        "contextos_without_compression",
+        "contextos_without_position_aware_layout",
+    ]
+    assert len(run.measurements) == 6
+    assert set(report["effects_vs_contextos_full"]) == set(run.strategies[1:])
+
+
 def test_cli_benchmark_compare_reports_zero_delta_for_same_run(tmp_path: Path) -> None:
     run_result = runner.invoke(
         app,

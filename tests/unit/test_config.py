@@ -34,6 +34,7 @@ def test_effective_budget_reserves_output_tokens() -> None:
     policy = OptimizationPolicy(max_input_tokens=100, reserve_output_tokens=25)
     assert policy.effective_budget == 75
     assert policy.semantic_dedup_threshold == 0.92
+    assert policy.semantic_dedup_enabled is True
     assert policy.semantic_relevance_enabled is True
 
 

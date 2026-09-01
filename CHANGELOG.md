@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4E six-variant ContextOS ablation runner covering semantic deduplication, recency, dependency scoring, compression, and position-aware layout, with per-case raw measurements, bootstrap intervals, explicit policy overrides, and deltas against full ContextOS.
+- `contextos benchmark ablation` and an explicit semantic-deduplication runtime switch for controlled single-component experiments.
 - Phase 4D Relevance Only and Naive Extractive baselines with deterministic budget selection, full optimization traces, public SDK/CLI access, and the shared six-strategy benchmark protocol.
 - Six-strategy ContextOS-Bench execution and same-provider/model LongBench comparison preparation with raw status, token, latency, selection, task-score, and quality-retention fields.
 - Explicit `contextos benchmark longbench run` support for one temperature-zero OpenAI configuration across every case and strategy; failed or infeasible comparisons remain raw and unscored.

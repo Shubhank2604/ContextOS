@@ -38,6 +38,7 @@ class OptimizationPolicy(BaseModel):
     max_input_tokens: int
     reserve_output_tokens: int = 0
     semantic_dedup_threshold: float = 0.92
+    semantic_dedup_enabled: bool = True
     semantic_relevance_enabled: bool = True
 
     weight_relevance: float = 0.25

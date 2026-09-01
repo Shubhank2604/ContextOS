@@ -44,7 +44,11 @@ from contextos.benchmarks.positional import (
     write_positional_run_artifact,
 )
 from contextos.benchmarks.positional_models import PositionalDataset
-from contextos.benchmarks.runner import run_contextos_bench
+from contextos.benchmarks.runner import (
+    ablation_effects,
+    default_ablation_strategies,
+    run_contextos_bench,
+)
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
 from contextos.models import ContextEdge, ContextItem
@@ -237,6 +241,45 @@ def benchmark_run_command(
                 "artifact": str(artifact_path),
                 "case_count": run.metadata["case_count"],
                 "aggregates": [aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("ablation")
+def benchmark_ablation_command(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ] = Path("benchmarks/datasets/contextos_bench.json"),
+    output_directory: Annotated[Path, typer.Option("--output-directory")] = Path(
+        "benchmarks/results"
+    ),
+    case_limit: Annotated[int | None, typer.Option("--case-limit", min=1)] = None,
+) -> None:
+    """Run the Phase 4E single-component ContextOS ablation study."""
+    try:
+        dataset = load_dataset(input_path)
+        run = run_contextos_bench(
+            dataset,
+            tokenizer=TiktokenTokenizer(),
+            strategies=default_ablation_strategies(),
+            case_limit=case_limit,
+        )
+        artifact_path = write_run_artifact(run, output_directory)
+    except (ContextOSError, OSError, ValueError, ValidationError) as exc:
+        typer.echo(f"ContextOS ablation failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "run_id": run.run_id,
+                "artifact": str(artifact_path),
+                "case_count": run.metadata["case_count"],
+                "aggregates": [aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+                "effects_vs_contextos_full": ablation_effects(run),
             },
             indent=2,
             sort_keys=True,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import platform
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Protocol
@@ -87,15 +87,30 @@ class BaselineBenchmarkStrategy:
 class ContextOSBenchmarkStrategy:
     """Adapt the integrated runtime without changing its public budget authority."""
 
+    def __init__(
+        self,
+        *,
+        name: str = "contextos",
+        policy_overrides: Mapping[str, object] | None = None,
+    ) -> None:
+        self._name = name
+        self._policy_overrides = dict(policy_overrides or {})
+
     @property
     def name(self) -> str:
-        return "contextos"
+        return self._name
+
+    @property
+    def policy_overrides(self) -> dict[str, object]:
+        """Return a copy of the single-variant policy changes for auditing."""
+        return dict(self._policy_overrides)
 
     def optimize(self, case: ContextOSBenchCase, tokenizer: Tokenizer) -> OptimizedContext:
+        policy = case.policy.model_copy(update=self._policy_overrides)
         return ContextOptimizer(tokenizer=tokenizer, edges=case.edges).optimize(
             case.task,
             case.context_items,
-            case.policy,
+            policy,
         )
 
 
@@ -112,6 +127,55 @@ def default_benchmark_strategies() -> list[BenchmarkStrategy]:
         BaselineBenchmarkStrategy(NaiveExtractiveBaseline()),
         ContextOSBenchmarkStrategy(),
     ]
+
+
+def default_ablation_strategies() -> list[ContextOSBenchmarkStrategy]:
+    """Return the six Phase 4E single-component ContextOS variants."""
+    return [
+        ContextOSBenchmarkStrategy(name="contextos_full"),
+        ContextOSBenchmarkStrategy(
+            name="contextos_without_semantic_deduplication",
+            policy_overrides={"semantic_dedup_enabled": False},
+        ),
+        ContextOSBenchmarkStrategy(
+            name="contextos_without_recency",
+            policy_overrides={"weight_recency": 0.0},
+        ),
+        ContextOSBenchmarkStrategy(
+            name="contextos_without_dependency_score",
+            policy_overrides={"weight_dependency": 0.0},
+        ),
+        ContextOSBenchmarkStrategy(
+            name="contextos_without_compression",
+            policy_overrides={"compression_enabled": False},
+        ),
+        ContextOSBenchmarkStrategy(
+            name="contextos_without_position_aware_layout",
+            policy_overrides={"position_aware_layout": False},
+        ),
+    ]
+
+
+def ablation_effects(run: BenchmarkRun) -> dict[str, dict[str, float]]:
+    """Calculate required Phase 4E metric deltas against full ContextOS."""
+    aggregates = {aggregate.strategy: aggregate for aggregate in run.aggregates}
+    try:
+        reference = aggregates["contextos_full"]
+    except KeyError:
+        raise ValueError("ablation run requires a contextos_full reference") from None
+    return {
+        strategy: {
+            "task_score_delta": aggregate.mean_task_specific_score
+            - reference.mean_task_specific_score,
+            "cir_delta": aggregate.mean_critical_information_recall
+            - reference.mean_critical_information_recall,
+            "input_token_delta": aggregate.mean_input_tokens - reference.mean_input_tokens,
+            "p95_optimizer_latency_ms_delta": aggregate.p95_optimizer_latency_ms
+            - reference.p95_optimizer_latency_ms,
+        }
+        for strategy, aggregate in aggregates.items()
+        if strategy != "contextos_full"
+    }
 
 
 def _run_case(
@@ -206,5 +270,10 @@ def run_contextos_bench(
             "case_count": len(selected_cases),
             "base_case_count": sum(case in dataset.base_cases for case in selected_cases),
             "generator_version": dataset.generator_version,
+            "strategy_configurations": {
+                strategy.name: strategy.policy_overrides
+                for strategy in selected_strategies
+                if isinstance(strategy, ContextOSBenchmarkStrategy)
+            },
         },
     )

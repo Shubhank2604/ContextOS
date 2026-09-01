@@ -112,12 +112,18 @@ class ContextOptimizer:
                 threshold=policy.semantic_dedup_threshold,
             )
 
-        try:
-            semantic = stage("semantic_dedup", run_semantic)
-        except EmbeddingProviderError:
-            warnings.append("embedding_provider_unavailable:deterministic_fallback")
-            provider = CachedEmbeddingProvider(DeterministicEmbeddingProvider())
-            semantic = stage("semantic_dedup", run_semantic)
+        if policy.semantic_dedup_enabled:
+            try:
+                semantic = stage("semantic_dedup", run_semantic)
+            except EmbeddingProviderError:
+                warnings.append("embedding_provider_unavailable:deterministic_fallback")
+                provider = CachedEmbeddingProvider(DeterministicEmbeddingProvider())
+                semantic = stage("semantic_dedup", run_semantic)
+        else:
+            semantic = stage(
+                "semantic_dedup",
+                lambda: DeduplicationResult(items=exact.items),
+            )
         warnings.extend(semantic.warnings)
         survivors = semantic.items
         contextual = stage(
@@ -136,9 +142,13 @@ class ContextOptimizer:
         importance = stage("importance", lambda: importance_scores(survivors))
         recency = stage(
             "recency",
-            lambda: recency_scores(
-                survivors,
-                half_life_seconds=policy.recency_half_life_seconds,
+            lambda: (
+                recency_scores(
+                    survivors,
+                    half_life_seconds=policy.recency_half_life_seconds,
+                )
+                if policy.weight_recency > 0
+                else {item.id: 0.0 for item in survivors}
             ),
         )
         novelty = stage("novelty", lambda: novelty_scores(survivors, provider=provider))
@@ -147,6 +157,8 @@ class ContextOptimizer:
                 novelty[item.id] = 1.0
 
         def dependency_stage() -> dict[str, float]:
+            if policy.weight_dependency == 0:
+                return {item.id: 0.0 for item in survivors}
             DependencyGraph([item.id for item in tokenized], self._edges)
             survivor_ids = {item.id for item in survivors}
             survivor_edges = [

@@ -38,6 +38,16 @@ The shared runner evaluates Full Context, Last-N, Sliding Window, Relevance Only
 
 Aggregate reports retain p50/p95 optimizer latency and deterministic bootstrap 95% confidence intervals when at least 20 successful cases are available. Generated artifacts are content-addressed and ignored by default until a later validation phase explicitly approves an immutable result for version control. No benchmark result is hand-authored.
 
+Run the Phase 4E single-component study with:
+
+```bash
+contextos benchmark ablation \
+  --input benchmarks/datasets/contextos_bench.json \
+  --output-directory out/phase4e-ablation
+```
+
+The six variants are full ContextOS and ContextOS without semantic deduplication, recency, dependency scoring, compression, or position-aware layout. Each generated artifact stores the exact policy override and raw case results; CLI output also reports task-score, CIR, mean-input-token, and p95-latency deltas against full ContextOS.
+
 `datasets/deduplication_cases.json` remains the focused deduplication regression fixture.
 
 ## Controlled positional retrieval

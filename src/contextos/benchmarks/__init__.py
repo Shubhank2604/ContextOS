@@ -14,7 +14,11 @@ from contextos.benchmarks.models import (
     RequiredFact,
     TaskMetric,
 )
-from contextos.benchmarks.runner import run_contextos_bench
+from contextos.benchmarks.runner import (
+    ablation_effects,
+    default_ablation_strategies,
+    run_contextos_bench,
+)
 
 __all__ = [
     "BenchmarkAggregate",
@@ -29,5 +33,7 @@ __all__ = [
     "ContextOSBenchDataset",
     "RequiredFact",
     "TaskMetric",
+    "ablation_effects",
+    "default_ablation_strategies",
     "run_contextos_bench",
 ]

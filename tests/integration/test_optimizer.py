@@ -29,6 +29,15 @@ class UnavailableEmbeddingProvider:
         raise EmbeddingProviderError("offline")
 
 
+class ConstantEmbeddingProvider:
+    @property
+    def identity(self) -> str:
+        return "constant"
+
+    def embed(self, texts: Sequence[str]) -> NDArray[np.float64]:
+        return np.ones((len(texts), 3), dtype=np.float64)
+
+
 def make_item(
     item_id: str,
     content: str,
@@ -127,6 +136,26 @@ def test_unavailable_semantic_provider_has_visible_offline_fallback() -> None:
     ).optimize("task", [source], policy(10))
 
     assert "embedding_provider_unavailable:deterministic_fallback" in result.trace.warnings
+
+
+def test_semantic_deduplication_can_be_explicitly_disabled_for_ablation() -> None:
+    first = make_item("first", "alpha beta", ContextType.MEMORY, 0)
+    second = make_item("second", "alpha beta extra", ContextType.MEMORY, 1)
+    optimizer = ContextOptimizer(
+        tokenizer=WordTokenizer(),
+        embedding_provider=ConstantEmbeddingProvider(),
+    )
+
+    enabled = optimizer.optimize("alpha", [first, second], policy(20))
+    disabled = optimizer.optimize(
+        "alpha",
+        [first, second],
+        policy(20).model_copy(update={"semantic_dedup_enabled": False}),
+    )
+
+    assert len(enabled.selected_items) == 1
+    assert {item.id for item in disabled.selected_items} == {"first", "second"}
+    assert all(item.semantic_duplicate_of is None for item in disabled.trace.items)
 
 
 def test_mandatory_overflow_fails_before_deduplication() -> None:

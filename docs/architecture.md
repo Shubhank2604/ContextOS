@@ -2,6 +2,8 @@
 
 ContextOS sits between application state and an LLM provider. Its staged optimizer will validate and tokenize candidate context, enforce mandatory retention, remove safe redundancy, score optional items, allocate budget, compress where allowed, arrange the final layout, and emit a complete decision trace.
 
+Semantic deduplication has an explicit default-on policy switch so ablation runs can bypass it without abusing similarity thresholds. Zero-weight recency and dependency configurations return neutral component scores and renormalize the remaining composite signals. These controls exist to isolate measured component effects; normal presets retain the full pipeline.
+
 Detailed component boundaries will be documented as each sequential milestone is implemented and verified.
 
 ## Baseline boundary
