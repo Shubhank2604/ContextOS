@@ -43,3 +43,13 @@ Sampling ranks preserved `(dataset, _id)` identities with a versioned SHA-256 se
 The evaluator follows the official LongBench task mapping: normalized English token F1 for the two QA datasets, paragraph-number precision for retrieval, and first uncommented-line similarity for RepoBench-P. Each prediction is scored against all accepted answers and keeps the maximum, matching the official evaluation convention. No LLM judge is used.
 
 Prediction scoring requires complete identity coverage and one provider/model configuration. Phase 4D adds the complete strategy comparison runner; Phase 4C deliberately does not fabricate model predictions when the external dependency or credentials are unavailable.
+
+## Phase 4D baseline comparison
+
+All applicable project-owned and LongBench comparisons now use six strategies: Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and ContextOS. Relevance Only is deliberately restricted to embedding relevance over whole items. Naive Extractive is deliberately restricted to sentence relevance and source-order restoration. They do not borrow ContextOS's typed retention, deduplication, multi-factor scoring, dependency propagation, allocation, or position-aware policy.
+
+Within one LongBench run, all strategies share the exact prepared case IDs, pinned prompt templates, provider, model, temperature-zero configuration, output bounds, context limit, and evaluator. Constrained strategies share one declared context budget. Full Context is called only when the unmodified prompt fits the declared provider limit; otherwise its raw status is `context_overflow` and its task score and quality reference remain unavailable.
+
+Raw predictions include strategy, status, original and constructed context tokens, local and provider prompt tokens, output/cached tokens when exposed, optimizer and provider latency, context reduction, selected chunk IDs, warnings, and model identity. Scoring requires the complete case-by-strategy matrix, never substitutes a missing prediction, and calculates quality retention only against a non-zero successful Full Context score for the same case and metric.
+
+The current offline ContextOS-Bench comparison is diagnostic, not a finalized empirical claim. Newly added simple baselines may outperform the current integrated configuration; those results must remain visible and motivate the Phase 4E ablation study rather than being filtered from reports.

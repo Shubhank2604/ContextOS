@@ -54,9 +54,9 @@ contextos inspect --input examples/data/coding_context.json
 contextos store stats --database out/contextos.sqlite
 ```
 
-Full Context, Last-N, and Sliding Window remain available with `--strategy` for controlled comparisons. The naive baselines deliberately do not enforce typed mandatory retention; that limitation is emitted in their traces.
+Full Context, Last-N, Sliding Window, Relevance Only, and Naive Extractive remain available with `--strategy` for controlled comparisons. The naive baselines deliberately do not enforce typed mandatory retention; that limitation is emitted in their traces.
 
-ContextOS-Bench contains 50 deterministic templated base cases across coding, research, and support/operations agents. Benchmark runs retain raw per-case task score, critical-information recall, token reduction, compression ratio, decision reasons, and optimizer timings. Result artifacts are generated locally and are not treated as measured project claims until reviewed and committed through the later v0.4 validation phases.
+ContextOS-Bench contains 50 deterministic templated base cases across coding, research, and support/operations agents. Every run compares Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and ContextOS, retaining raw per-case task score, critical-information recall, token reduction, compression ratio, decision reasons, and optimizer timings. Result artifacts are generated locally and are not treated as measured project claims until reviewed and committed through the later v0.4 validation phases.
 
 ## License
 

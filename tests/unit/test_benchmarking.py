@@ -16,6 +16,8 @@ def test_quick_benchmark_is_deterministic() -> None:
         "full_context",
         "last_n",
         "sliding_window",
+        "relevance_only",
+        "naive_extractive",
     ]
     assert first["results"][0]["status"] == "overflow"
 

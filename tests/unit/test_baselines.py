@@ -10,6 +10,8 @@ from contextos.baselines import (
     BaselineStrategy,
     FullContextBaseline,
     LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
 from contextos.config import OptimizationPolicy
@@ -146,6 +148,43 @@ def test_sliding_window_applies_newest_budget_within_window() -> None:
     assert result.trace.items[0].decision_reason == "recent_window_budget_exhausted"
 
 
+def test_relevance_only_selects_task_matching_whole_items() -> None:
+    items = [
+        make_item("unrelated", "formatting colors", 0),
+        make_item("relevant", "authentication timeout", 1),
+    ]
+    result = RelevanceOnlyBaseline().optimize(
+        task="authentication timeout",
+        items=items,
+        policy=OptimizationPolicy(max_input_tokens=2),
+        tokenizer=WordTokenizer(),
+    )
+
+    assert [item.id for item in result.selected_items] == ["relevant"]
+    assert result.trace.items[1].relevance_score == pytest.approx(1.0)
+    assert result.trace.items[0].decision_reason == "outside_relevance_budget"
+
+
+def test_naive_extractive_selects_relevant_sentences_under_budget() -> None:
+    item = make_item(
+        "mixed",
+        "Formatting colors changed. Authentication timeout failed.",
+        0,
+    )
+    result = NaiveExtractiveBaseline().optimize(
+        task="authentication timeout",
+        items=[item],
+        policy=OptimizationPolicy(max_input_tokens=3),
+        tokenizer=WordTokenizer(),
+    )
+
+    assert result.selected_items[0].content == "Authentication timeout failed."
+    assert result.final_token_count == 3
+    assert result.trace.compressed_count == 1
+    assert result.trace.items[0].decision is OptimizationDecision.COMPRESSED
+    assert result.trace.items[0].compression_strategy == "naive_extractive"
+
+
 @pytest.mark.parametrize("window_seconds", [0, -1, True])
 def test_sliding_window_requires_positive_integer(window_seconds: int) -> None:
     with pytest.raises(ValueError, match="positive integer"):
@@ -154,7 +193,12 @@ def test_sliding_window_requires_positive_integer(window_seconds: int) -> None:
 
 def test_baselines_do_not_mutate_source_items() -> None:
     item = make_item("source", "one two", 0)
-    optimize(LastNTokensBaseline(), [item], budget=2)
+    for strategy in (
+        LastNTokensBaseline(),
+        RelevanceOnlyBaseline(),
+        NaiveExtractiveBaseline(),
+    ):
+        optimize(strategy, [item], budget=2)
     assert item.token_count is None
 
 

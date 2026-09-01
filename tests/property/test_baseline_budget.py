@@ -5,7 +5,13 @@ from datetime import UTC, datetime, timedelta
 from hypothesis import given
 from hypothesis import strategies as st
 
-from contextos.baselines import BaselineStrategy, LastNTokensBaseline, SlidingWindowBaseline
+from contextos.baselines import (
+    BaselineStrategy,
+    LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
+    SlidingWindowBaseline,
+)
 from contextos.config import OptimizationPolicy
 from contextos.models import ContextItem, ContextType
 
@@ -38,6 +44,8 @@ def test_selecting_baselines_never_exceed_budget(contents: list[str], budget: in
     strategies: list[BaselineStrategy] = [
         LastNTokensBaseline(),
         SlidingWindowBaseline(window_seconds=60),
+        RelevanceOnlyBaseline(),
+        NaiveExtractiveBaseline(),
     ]
     for strategy in strategies:
         result = strategy.optimize(

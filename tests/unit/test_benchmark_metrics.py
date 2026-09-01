@@ -41,6 +41,8 @@ def test_runner_scores_full_reference_and_contextos_on_same_case() -> None:
         "contextos",
         "full_context",
         "last_n",
+        "naive_extractive",
+        "relevance_only",
         "sliding_window",
     }
     assert measurements["full_context"].status == "ok"

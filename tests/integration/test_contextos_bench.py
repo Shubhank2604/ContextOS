@@ -13,8 +13,8 @@ def test_all_fifty_base_cases_produce_raw_results_and_confidence_intervals() -> 
 
     assert run.metadata["case_count"] == 50
     assert run.metadata["base_case_count"] == 50
-    assert len(run.measurements) == 200
-    assert len(run.aggregates) == 4
+    assert len(run.measurements) == 300
+    assert len(run.aggregates) == 6
     assert all(aggregate.case_count == 50 for aggregate in run.aggregates)
     assert all(aggregate.task_score_ci95 is not None for aggregate in run.aggregates)
     assert all(aggregate.cir_ci95 is not None for aggregate in run.aggregates)

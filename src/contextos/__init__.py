@@ -1,6 +1,12 @@
 """Public package surface for ContextOS."""
 
-from contextos.baselines import FullContextBaseline, LastNTokensBaseline, SlidingWindowBaseline
+from contextos.baselines import (
+    FullContextBaseline,
+    LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
+    SlidingWindowBaseline,
+)
 from contextos.budget import AllocationPlan
 from contextos.config import OptimizationPolicy
 from contextos.models import (
@@ -23,9 +29,11 @@ __all__ = [
     "FullContextBaseline",
     "LastNTokensBaseline",
     "LifecycleTier",
+    "NaiveExtractiveBaseline",
     "OptimizationPolicy",
     "OptimizationTrace",
     "OptimizedContext",
+    "RelevanceOnlyBaseline",
     "SlidingWindowBaseline",
 ]
 

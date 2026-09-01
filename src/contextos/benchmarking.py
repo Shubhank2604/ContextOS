@@ -13,6 +13,8 @@ from contextos.baselines import (
     BaselineStrategy,
     FullContextBaseline,
     LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
 from contextos.config import OptimizationPolicy
@@ -67,6 +69,8 @@ def run_quick_baseline_benchmark(tokenizer: Tokenizer) -> dict[str, Any]:
         FullContextBaseline(),
         LastNTokensBaseline(),
         SlidingWindowBaseline(window_seconds=2 * 60 * 60),
+        RelevanceOnlyBaseline(),
+        NaiveExtractiveBaseline(),
     ]
     results: list[dict[str, Any]] = []
     for strategy in strategies:

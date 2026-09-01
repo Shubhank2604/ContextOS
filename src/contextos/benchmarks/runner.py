@@ -15,6 +15,8 @@ from contextos.baselines import (
     BaselineStrategy,
     FullContextBaseline,
     LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
 from contextos.benchmarks.metrics import (
@@ -98,7 +100,7 @@ class ContextOSBenchmarkStrategy:
 
 
 def default_benchmark_strategies() -> list[BenchmarkStrategy]:
-    """Return the Phase 4A comparison strategies in stable order."""
+    """Return the complete required Phase 4D comparison in stable order."""
     return [
         BaselineBenchmarkStrategy(
             FullContextBaseline(),
@@ -106,6 +108,8 @@ def default_benchmark_strategies() -> list[BenchmarkStrategy]:
         ),
         BaselineBenchmarkStrategy(LastNTokensBaseline()),
         BaselineBenchmarkStrategy(SlidingWindowBaseline(window_seconds=7 * 86_400)),
+        BaselineBenchmarkStrategy(RelevanceOnlyBaseline()),
+        BaselineBenchmarkStrategy(NaiveExtractiveBaseline()),
         ContextOSBenchmarkStrategy(),
     ]
 

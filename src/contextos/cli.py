@@ -15,6 +15,8 @@ from contextos.baselines import (
     BaselineStrategy,
     FullContextBaseline,
     LastNTokensBaseline,
+    NaiveExtractiveBaseline,
+    RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
 from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
@@ -30,6 +32,10 @@ from contextos.benchmarks.longbench import (
     write_score_report,
 )
 from contextos.benchmarks.longbench_models import LongBenchProfile
+from contextos.benchmarks.longbench_runner import (
+    run_longbench_comparison,
+    write_longbench_predictions,
+)
 from contextos.benchmarks.models import BenchmarkRun
 from contextos.benchmarks.positional import (
     load_positional_dataset,
@@ -69,6 +75,8 @@ class BaselineName(StrEnum):
     FULL = "full"
     LAST_N = "last-n"
     SLIDING_WINDOW = "sliding-window"
+    RELEVANCE_ONLY = "relevance-only"
+    NAIVE_EXTRACTIVE = "naive-extractive"
 
 
 class PositionalProviderName(StrEnum):
@@ -134,8 +142,12 @@ def optimize(
                 baseline = FullContextBaseline()
             elif strategy is BaselineName.LAST_N:
                 baseline = LastNTokensBaseline()
-            else:
+            elif strategy is BaselineName.SLIDING_WINDOW:
                 baseline = SlidingWindowBaseline(window_seconds=window_seconds)
+            elif strategy is BaselineName.RELEVANCE_ONLY:
+                baseline = RelevanceOnlyBaseline()
+            else:
+                baseline = NaiveExtractiveBaseline()
             result = baseline.optimize(
                 task=task,
                 items=items,
@@ -378,6 +390,72 @@ def benchmark_longbench_score_command(
                 "dataset_aggregates": [
                     aggregate.model_dump(mode="json") for aggregate in report.dataset_aggregates
                 ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+@longbench_app.command("run")
+def benchmark_longbench_run_command(
+    prepared_path: Annotated[
+        Path,
+        typer.Option("--prepared", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ],
+    output_path: Annotated[Path, typer.Option("--output")],
+    model: Annotated[str, typer.Option("--model")],
+    context_budget_tokens: Annotated[
+        int,
+        typer.Option("--context-budget-tokens", min=1),
+    ],
+    max_context_tokens: Annotated[
+        int,
+        typer.Option("--max-context-tokens", min=2),
+    ],
+    max_chunk_tokens: Annotated[
+        int,
+        typer.Option("--max-chunk-tokens", min=1),
+    ] = 256,
+) -> None:
+    """Explicitly run all six strategies through one OpenAI model configuration."""
+    try:
+        if not model.strip():
+            raise ValueError("--model must not be blank")
+        subset = load_prepared_subset(prepared_path)
+        predictions = run_longbench_comparison(
+            subset,
+            provider=OpenAIProvider(model=model, temperature=0.0),
+            provider_name="openai",
+            provider_model=model,
+            tokenizer=TiktokenTokenizer(),
+            context_budget_tokens=context_budget_tokens,
+            max_context_tokens=max_context_tokens,
+            max_chunk_tokens=max_chunk_tokens,
+        )
+        if not any(prediction.status == "ok" for prediction in predictions):
+            first_warning = next(
+                (prediction.warnings[0] for prediction in predictions if prediction.warnings),
+                "no strategy completed",
+            )
+            raise ValueError(f"all LongBench comparisons failed: {first_warning}")
+        artifact = write_longbench_predictions(predictions, output_path)
+    except (ContextOSError, OSError, ValueError, ValidationError) as exc:
+        typer.echo(f"LongBench comparison failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "artifact": str(artifact),
+                "case_count": len(subset.cases),
+                "prediction_count": len(predictions),
+                "provider": "openai",
+                "model": model,
+                "strategies": sorted({prediction.strategy for prediction in predictions}),
+                "status_counts": {
+                    status: sum(prediction.status == status for prediction in predictions)
+                    for status in sorted({prediction.status for prediction in predictions})
+                },
             },
             indent=2,
             sort_keys=True,

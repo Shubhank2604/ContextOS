@@ -6,7 +6,7 @@ The deterministic smoke profile runs with:
 contextos benchmark --profile quick
 ```
 
-It executes one fixed mixed-context case through Full Context, Last-N, Sliding Window, and the integrated ContextOS optimizer. The report contains deterministic token and selection outcomes; timing measurements remain in optimization traces and are intentionally excluded from deterministic equality checks.
+It executes one fixed mixed-context case through Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and the integrated ContextOS optimizer. The report contains deterministic token and selection outcomes; timing measurements remain in optimization traces and are intentionally excluded from deterministic equality checks.
 
 ## ContextOS-Bench
 
@@ -34,7 +34,7 @@ contextos benchmark run \
   --output-directory benchmarks/results
 ```
 
-The shared runner evaluates Full Context, Last-N, Sliding Window, and ContextOS. Full Context receives enough budget to act as the quality reference; other strategies use the case's configured optimization budget. Each raw result contains task-specific required-fact score, quality retention, Critical Information Recall, input tokens, context reduction, compression ratio, optimizer/embedding/compression timing, selected IDs, and decision reasons.
+The shared runner evaluates Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and ContextOS. Full Context receives enough budget to act as the quality reference; other strategies use the case's configured optimization budget. Each raw result contains task-specific required-fact score, quality retention, Critical Information Recall, input tokens, context reduction, compression ratio, optimizer/embedding/compression timing, selected IDs, and decision reasons.
 
 Aggregate reports retain p50/p95 optimizer latency and deterministic bootstrap 95% confidence intervals when at least 20 successful cases are available. Generated artifacts are content-addressed and ignored by default until a later validation phase explicitly approves an immutable result for version control. No benchmark result is hand-authored.
 
@@ -95,7 +95,7 @@ No download occurs on import, during normal tests, or in standard CI. Prepared d
 Predictions are newline-delimited JSON objects keyed by the preserved identity:
 
 ```json
-{"dataset":"hotpotqa","source_id":"UPSTREAM_ID","prediction":"...","provider":"PROVIDER","model":"MODEL_ID"}
+{"dataset":"hotpotqa","source_id":"UPSTREAM_ID","strategy":"full_context","prediction":"...","provider":"PROVIDER","model":"MODEL_ID"}
 ```
 
 Score one complete prediction file with:
@@ -108,3 +108,20 @@ contextos benchmark longbench score \
 ```
 
 Scoring rejects duplicate, missing, or unknown source IDs and mixed provider/model configurations. Aggregates remain separate by dataset and metric; unlike metrics are never collapsed into an unexplained overall average.
+
+### Six-strategy provider comparison
+
+Run all required strategies against one explicitly selected OpenAI configuration:
+
+```bash
+contextos benchmark longbench run \
+  --prepared out/longbench/prepared-standard.json \
+  --output out/longbench/predictions-standard.jsonl \
+  --model MODEL_ID \
+  --context-budget-tokens 8192 \
+  --max-context-tokens MODEL_CONTEXT_LIMIT
+```
+
+The runner splits each external context into exact contiguous source-preserving chunks, uses the same case prompt, output bound, provider, model, temperature, evaluator, and constrained context budget for every applicable strategy, and records Full Context as infeasible rather than silently truncating it. The command requires `OPENAI_API_KEY`; it is never run by normal CI. Score the resulting JSONL with the separate `longbench score` command above.
+
+The same prepare/run/score sequence is available through the manual-only `LongBench comparison` GitHub Actions workflow. It requires explicit inputs and the `OPENAI_API_KEY` repository secret; push and pull-request CI never invokes it.

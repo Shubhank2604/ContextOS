@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4D Relevance Only and Naive Extractive baselines with deterministic budget selection, full optimization traces, public SDK/CLI access, and the shared six-strategy benchmark protocol.
+- Six-strategy ContextOS-Bench execution and same-provider/model LongBench comparison preparation with raw status, token, latency, selection, task-score, and quality-retention fields.
+- Explicit `contextos benchmark longbench run` support for one temperature-zero OpenAI configuration across every case and strategy; failed or infeasible comparisons remain raw and unscored.
 - Phase 4C pinned LongBench subset configuration for HotpotQA, 2WikiMQA, PassageRetrieval-en, and RepoBench-P, with deterministic quick/standard/full profiles and preserved source IDs.
 - Lazy explicit Hugging Face preparation, validated local external-data manifests, LongBench-compatible QA F1/retrieval/code metrics, and complete ID-keyed prediction scoring.
 - `contextos benchmark longbench prepare` and `contextos benchmark longbench score`; normal CI remains offline and never downloads external datasets.

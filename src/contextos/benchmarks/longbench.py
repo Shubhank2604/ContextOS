@@ -68,6 +68,7 @@ class HuggingFaceLongBenchSource:
             dataset,
             split=split,
             revision=revision,
+            trust_remote_code=True,
         )
         return cast(Iterable[Mapping[str, Any]], loaded)
 
@@ -271,13 +272,18 @@ def score_longbench_predictions(
     predictions: Sequence[LongBenchPrediction],
 ) -> LongBenchScoreReport:
     """Join by preserved IDs, reject incomplete comparisons, and aggregate per dataset."""
-    by_identity: dict[tuple[str, str], LongBenchPrediction] = {}
+    by_identity: dict[tuple[str, str, str], LongBenchPrediction] = {}
     for prediction in predictions:
-        identity = (prediction.dataset, prediction.source_id)
+        identity = (prediction.dataset, prediction.source_id, prediction.strategy)
         if identity in by_identity:
-            raise ValueError(f"duplicate prediction identity: {identity[0]}/{identity[1]}")
+            raise ValueError(
+                f"duplicate prediction identity: {identity[0]}/{identity[1]}/{identity[2]}"
+            )
         by_identity[identity] = prediction
-    expected = {(case.dataset, case.source_id) for case in subset.cases}
+    strategies = sorted({prediction.strategy for prediction in predictions})
+    expected = {
+        (case.dataset, case.source_id, strategy) for case in subset.cases for strategy in strategies
+    }
     supplied = set(by_identity)
     missing = sorted(expected - supplied)
     unknown = sorted(supplied - expected)
@@ -289,30 +295,77 @@ def score_longbench_predictions(
     models = {prediction.model for prediction in predictions}
     if len(providers) != 1 or len(models) != 1:
         raise ValueError("all LongBench predictions must use one provider and model configuration")
-    case_scores = [
+    raw_case_scores = [
         LongBenchCaseScore(
             dataset=case.dataset,
             source_id=case.source_id,
+            strategy=strategy,
+            status=by_identity[(case.dataset, case.source_id, strategy)].status,
             metric=case.metric,
-            score=score_longbench_case(
-                case,
-                by_identity[(case.dataset, case.source_id)].prediction,
+            score=(
+                score_longbench_case(
+                    case,
+                    by_identity[(case.dataset, case.source_id, strategy)].prediction,
+                )
+                if by_identity[(case.dataset, case.source_id, strategy)].status == "ok"
+                else None
             ),
-            prediction=by_identity[(case.dataset, case.source_id)].prediction,
+            prediction=by_identity[(case.dataset, case.source_id, strategy)].prediction,
             answers=case.answers,
         )
         for case in subset.cases
+        for strategy in strategies
     ]
-    aggregates = [
-        LongBenchDatasetAggregate(
-            dataset=dataset,
-            metric=dataset_scores[0].metric,
-            case_count=len(dataset_scores),
-            mean_score=mean(score.score for score in dataset_scores),
+    full_scores = {
+        (score.dataset, score.source_id): score.score
+        for score in raw_case_scores
+        if score.strategy == "full_context" and score.status == "ok"
+    }
+    case_scores = [
+        score.model_copy(
+            update={
+                "quality_retention": (
+                    score.score / full_score
+                    if score.score is not None
+                    and (full_score := full_scores.get((score.dataset, score.source_id)))
+                    is not None
+                    and full_score > 0
+                    else None
+                )
+            }
         )
-        for dataset in sorted({score.dataset for score in case_scores})
-        if (dataset_scores := [score for score in case_scores if score.dataset == dataset])
+        for score in raw_case_scores
     ]
+    aggregates: list[LongBenchDatasetAggregate] = []
+    for dataset, strategy in sorted({(score.dataset, score.strategy) for score in case_scores}):
+        aggregate_scores = [
+            score
+            for score in case_scores
+            if score.dataset == dataset and score.strategy == strategy
+        ]
+        successful_scores = [
+            score for score in aggregate_scores if score.status == "ok" and score.score is not None
+        ]
+        quality_retentions = [
+            score.quality_retention
+            for score in successful_scores
+            if score.quality_retention is not None
+        ]
+        aggregates.append(
+            LongBenchDatasetAggregate(
+                dataset=dataset,
+                strategy=strategy,
+                metric=aggregate_scores[0].metric,
+                case_count=len(aggregate_scores),
+                successful_case_count=len(successful_scores),
+                mean_score=(
+                    mean(score.score for score in successful_scores if score.score is not None)
+                    if successful_scores
+                    else None
+                ),
+                mean_quality_retention=(mean(quality_retentions) if quality_retentions else None),
+            )
+        )
     prepared_sha = hashlib.sha256(subset.model_dump_json().encode()).hexdigest()
     return LongBenchScoreReport(
         prepared_sha256=prepared_sha,

@@ -6,11 +6,13 @@ Detailed component boundaries will be documented as each sequential milestone is
 
 ## Baseline boundary
 
-All strategies accept an `OptimizationPolicy`, tokenize isolated copies of input items, and return an `OptimizedContext` with budget accounting and an `OptimizationTrace`. The current baselines operate on whole context items:
+All strategies accept an `OptimizationPolicy`, tokenize isolated copies of input items, and return an `OptimizedContext` with budget accounting and an `OptimizationTrace`:
 
 - Full Context retains input order and raises `ContextBudgetOverflow` instead of truncating.
 - Last-N ranks by `updated_at`, then `created_at`, then item ID, and retains the newest contiguous suffix that fits while preserving original order in the output.
 - Sliding Window uses the newest `updated_at` as its deterministic reference time, removes items outside the configured window, and applies Last-N whole-item selection if the window exceeds budget.
+- Relevance Only ranks whole items solely by task-to-item embedding relevance and greedily admits those that fit. It has no type, recency, dependency, novelty, deduplication, or compression logic.
+- Naive Extractive ranks source sentences solely by task relevance, greedily admits sentences under the common budget, and restores source-item and sentence order. It does not use ContextOS composite scoring or allocation.
 
 Mandatory retention is intentionally absent from these naive comparison strategies and is identified by a trace warning. Hard retention belongs to the integrated ContextOS optimizer pipeline.
 

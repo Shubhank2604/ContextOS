@@ -90,7 +90,7 @@ def test_cli_quick_benchmark_runs_end_to_end() -> None:
     assert result.exit_code == 0
     report = json.loads(result.stdout)
     assert report["profile"] == "quick"
-    assert len(report["results"]) == 4
+    assert len(report["results"]) == 6
     assert report["results"][-1]["strategy"] == "contextos"
 
 
@@ -103,6 +103,29 @@ def test_cli_contextos_optimize_is_the_default(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     assert "Strategy: contextos" in result.stdout
+
+
+@pytest.mark.parametrize("strategy", ["relevance-only", "naive-extractive"])
+def test_cli_exposes_complete_phase4d_baselines(tmp_path: Path, strategy: str) -> None:
+    input_path = tmp_path / "items.json"
+    write_input(input_path)
+    result = runner.invoke(
+        app,
+        [
+            "optimize",
+            "--input",
+            str(input_path),
+            "--budget",
+            "20",
+            "--task",
+            "compact fixture",
+            "--strategy",
+            strategy,
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Selected items: cli-item" in result.stdout
 
 
 def test_cli_inspect_runs_without_optimization(tmp_path: Path) -> None:
@@ -159,7 +182,7 @@ def test_cli_contextos_bench_writes_immutable_artifact(tmp_path: Path) -> None:
     assert artifact.exists()
     run = BenchmarkRun.model_validate_json(artifact.read_text(encoding="utf-8"))
     assert run.metadata["case_count"] == 1
-    assert len(run.measurements) == 4
+    assert len(run.measurements) == 6
 
 
 def test_cli_benchmark_compare_reports_zero_delta_for_same_run(tmp_path: Path) -> None:
@@ -339,3 +362,56 @@ def test_cli_longbench_prepare_uses_explicit_external_adapter(
         "passage_retrieval_en": 2,
         "repobench-p": 2,
     }
+
+
+def test_cli_longbench_run_requires_working_explicit_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    case = LongBenchCase(
+        dataset="hotpotqa",
+        source_id="source-1",
+        input="What is the answer?",
+        context="The answer is ContextOS.",
+        answers=["ContextOS"],
+        source_length=4,
+        language="en",
+        metric=LongBenchMetric.QA_F1,
+        prompt_template="Context: {context}\nQuestion: {input}\nAnswer:",
+        max_output_tokens=4,
+    )
+    subset = PreparedLongBenchSubset(
+        profile=LongBenchProfile.QUICK,
+        source_repository="fixture",
+        source_revision="fixture-revision",
+        source_split="test",
+        sampling_seed=1,
+        cases=[case],
+    )
+    prepared_path = tmp_path / "prepared.json"
+    output_path = tmp_path / "predictions.jsonl"
+    prepared_path.write_text(subset.model_dump_json(indent=2), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "longbench",
+            "run",
+            "--prepared",
+            str(prepared_path),
+            "--output",
+            str(output_path),
+            "--model",
+            "configured-model",
+            "--context-budget-tokens",
+            "16",
+            "--max-context-tokens",
+            "128",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "all LongBench comparisons failed" in result.stderr
+    assert not output_path.exists()

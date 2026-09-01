@@ -119,14 +119,35 @@ class LongBenchPrediction(BaseModel):
 
     dataset: str
     source_id: str
+    strategy: str = "unassigned"
+    status: str = "ok"
     prediction: str
     provider: str
     model: str
+    original_context_tokens: int | None = Field(default=None, ge=0)
+    input_context_tokens: int | None = Field(default=None, ge=0)
+    prompt_input_tokens: int | None = Field(default=None, ge=0)
+    provider_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    cached_tokens: int | None = Field(default=None, ge=0)
+    context_reduction: float | None = Field(default=None, ge=0.0, le=1.0)
+    optimizer_latency_ms: float | None = Field(default=None, ge=0.0)
+    provider_latency_ms: float | None = Field(default=None, ge=0.0)
+    selected_item_ids: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_identity(self) -> LongBenchPrediction:
         if not all(
-            value.strip() for value in (self.dataset, self.source_id, self.provider, self.model)
+            value.strip()
+            for value in (
+                self.dataset,
+                self.source_id,
+                self.strategy,
+                self.status,
+                self.provider,
+                self.model,
+            )
         ):
             raise ValueError("prediction dataset, source ID, provider, and model must not be blank")
         return self
@@ -139,8 +160,11 @@ class LongBenchCaseScore(BaseModel):
 
     dataset: str
     source_id: str
+    strategy: str
+    status: str
     metric: LongBenchMetric
-    score: float = Field(ge=0.0, le=1.0)
+    score: float | None = Field(default=None, ge=0.0, le=1.0)
+    quality_retention: float | None = Field(default=None, ge=0.0)
     prediction: str
     answers: list[str]
 
@@ -151,9 +175,12 @@ class LongBenchDatasetAggregate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     dataset: str
+    strategy: str
     metric: LongBenchMetric
     case_count: int = Field(gt=0)
-    mean_score: float = Field(ge=0.0, le=1.0)
+    successful_case_count: int = Field(ge=0)
+    mean_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    mean_quality_retention: float | None = Field(default=None, ge=0.0)
 
 
 class LongBenchScoreReport(BaseModel):
