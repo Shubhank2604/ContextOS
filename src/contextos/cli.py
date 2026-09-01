@@ -18,6 +18,9 @@ from contextos.baselines import (
     SlidingWindowBaseline,
 )
 from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
+from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
+from contextos.benchmarks.models import BenchmarkRun
+from contextos.benchmarks.runner import run_contextos_bench
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
 from contextos.models import ContextEdge, ContextItem
@@ -137,7 +140,11 @@ def benchmark(
     if ctx.invoked_subcommand is not None:
         return
     if profile != "quick":
-        typer.echo("Benchmark failed: Milestone 1 supports only the 'quick' profile", err=True)
+        typer.echo(
+            "Benchmark failed: the callback supports only 'quick'; use 'benchmark run' "
+            "for ContextOS-Bench",
+            err=True,
+        )
         raise typer.Exit(code=2)
     report = run_quick_benchmark(TiktokenTokenizer())
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
@@ -158,6 +165,43 @@ def benchmark_deduplication(
         typer.echo(f"Deduplication benchmark failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(metrics.model_dump_json(indent=2))
+
+
+@benchmark_app.command("run")
+def benchmark_run_command(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ] = Path("benchmarks/datasets/contextos_bench.json"),
+    output_directory: Annotated[Path, typer.Option("--output-directory")] = Path(
+        "benchmarks/results"
+    ),
+    case_limit: Annotated[int | None, typer.Option("--case-limit", min=1)] = None,
+) -> None:
+    """Run ContextOS-Bench and write an immutable raw result artifact."""
+    try:
+        dataset = load_dataset(input_path)
+        run = run_contextos_bench(
+            dataset,
+            tokenizer=TiktokenTokenizer(),
+            case_limit=case_limit,
+        )
+        artifact_path = write_run_artifact(run, output_directory)
+    except (ContextOSError, OSError, ValueError, ValidationError) as exc:
+        typer.echo(f"ContextOS-Bench failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "run_id": run.run_id,
+                "artifact": str(artifact_path),
+                "case_count": run.metadata["case_count"],
+                "aggregates": [aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 @app.command()
@@ -192,15 +236,29 @@ def benchmark_compare(
     left: Annotated[Path, typer.Option("--left", exists=True, dir_okay=False)],
     right: Annotated[Path, typer.Option("--right", exists=True, dir_okay=False)],
 ) -> None:
-    """Compare the raw result counts from two benchmark reports."""
+    """Compare aggregate metrics from two runs of the same dataset."""
     try:
-        left_report = json.loads(left.read_text(encoding="utf-8"))
-        right_report = json.loads(right.read_text(encoding="utf-8"))
+        left_run = BenchmarkRun.model_validate_json(left.read_text(encoding="utf-8"))
+        right_run = BenchmarkRun.model_validate_json(right.read_text(encoding="utf-8"))
+        if left_run.dataset_sha256 != right_run.dataset_sha256:
+            raise ValueError("benchmark runs use different datasets")
+        left_aggregates = {aggregate.strategy: aggregate for aggregate in left_run.aggregates}
+        right_aggregates = {aggregate.strategy: aggregate for aggregate in right_run.aggregates}
+        shared_strategies = sorted(set(left_aggregates) & set(right_aggregates))
         comparison = {
-            "left_result_count": len(left_report.get("results", [])),
-            "right_result_count": len(right_report.get("results", [])),
+            strategy: {
+                "task_score_delta": right_aggregates[strategy].mean_task_specific_score
+                - left_aggregates[strategy].mean_task_specific_score,
+                "cir_delta": right_aggregates[strategy].mean_critical_information_recall
+                - left_aggregates[strategy].mean_critical_information_recall,
+                "input_token_delta": right_aggregates[strategy].mean_input_tokens
+                - left_aggregates[strategy].mean_input_tokens,
+                "p95_latency_ms_delta": right_aggregates[strategy].p95_optimizer_latency_ms
+                - left_aggregates[strategy].p95_optimizer_latency_ms,
+            }
+            for strategy in shared_strategies
         }
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
         typer.echo(f"Benchmark comparison failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(json.dumps(comparison, indent=2, sort_keys=True))

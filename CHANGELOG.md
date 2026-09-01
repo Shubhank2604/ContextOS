@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Phase 4A ContextOS-Bench schema and deterministic generator with 50 templated base cases across coding, research, and support/operations scenarios.
+- Exact required-fact annotations covering dates, identifiers, changed-number and negation traps, supersession, contradictions, recent noise, and one-/two-hop dependencies.
+- Shared Full Context, Last-N, Sliding Window, and ContextOS benchmark runner with raw task, CIR, token, compression, and latency measurements.
+- Deterministic bootstrap confidence intervals and content-addressed local benchmark artifacts.
+- `contextos benchmark run` and aggregate-aware `contextos benchmark compare` commands.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added

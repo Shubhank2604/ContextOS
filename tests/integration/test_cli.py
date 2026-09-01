@@ -6,6 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from contextos.benchmarks.models import BenchmarkRun
 from contextos.cli import app
 from contextos.models import ContextItem, ContextType
 
@@ -125,4 +126,52 @@ def test_cli_deduplication_benchmark_runs_end_to_end() -> None:
 def test_cli_rejects_unknown_benchmark_profile() -> None:
     result = runner.invoke(app, ["benchmark", "--profile", "standard"])
     assert result.exit_code == 2
-    assert "supports only the 'quick' profile" in result.stderr
+    assert "supports only 'quick'" in result.stderr
+
+
+def test_cli_contextos_bench_writes_immutable_artifact(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "run",
+            "--input",
+            "benchmarks/datasets/contextos_bench.json",
+            "--output-directory",
+            str(tmp_path),
+            "--case-limit",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    artifact = Path(report["artifact"])
+    assert artifact.exists()
+    run = BenchmarkRun.model_validate_json(artifact.read_text(encoding="utf-8"))
+    assert run.metadata["case_count"] == 1
+    assert len(run.measurements) == 4
+
+
+def test_cli_benchmark_compare_reports_zero_delta_for_same_run(tmp_path: Path) -> None:
+    run_result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "run",
+            "--output-directory",
+            str(tmp_path),
+            "--case-limit",
+            "1",
+        ],
+    )
+    artifact = json.loads(run_result.stdout)["artifact"]
+    comparison = runner.invoke(
+        app,
+        ["benchmark", "compare", "--left", artifact, "--right", artifact],
+    )
+
+    assert comparison.exit_code == 0
+    report = json.loads(comparison.stdout)
+    assert report["contextos"]["task_score_delta"] == 0.0
+    assert report["contextos"]["cir_delta"] == 0.0
