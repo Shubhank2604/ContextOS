@@ -63,3 +63,48 @@ Regenerate the parameter grid with:
 ```bash
 python -m contextos.benchmarks.positional --output benchmarks/datasets/positional_retrieval.json
 ```
+
+## LongBench subset
+
+`config/longbench_subset.json` pins the external source revision and configures four representative English tasks:
+
+- `hotpotqa` and `2wikimqa`: multi-document QA, scored with normalized token F1;
+- `passage_retrieval_en`: synthetic retrieval, scored with the official paragraph-number metric;
+- `repobench-p`: code completion, scored with the official first-code-line similarity method.
+
+The [official LongBench repository](https://github.com/THUDM/LongBench) is MIT licensed and documents the provenance of constituent tasks. External records remain subject to their upstream acknowledgements and terms; this project does not redistribute them.
+
+Profiles are deterministic and preserve LongBench `_id` values:
+
+- `quick`: 2 examples per task, 8 total, for development only;
+- `standard`: 25 examples per task, 100 total;
+- `full`: every example exposed by the four pinned task configurations.
+
+Install the optional dependencies and explicitly prepare external data:
+
+```bash
+python -m pip install -e ".[benchmark]"
+contextos benchmark longbench prepare \
+  --config benchmarks/config/longbench_subset.json \
+  --profile standard \
+  --output out/longbench/prepared-standard.json
+```
+
+No download occurs on import, during normal tests, or in standard CI. Prepared datasets remain under ignored local output directories and must not be committed without a separate license/size review.
+
+Predictions are newline-delimited JSON objects keyed by the preserved identity:
+
+```json
+{"dataset":"hotpotqa","source_id":"UPSTREAM_ID","prediction":"...","provider":"PROVIDER","model":"MODEL_ID"}
+```
+
+Score one complete prediction file with:
+
+```bash
+contextos benchmark longbench score \
+  --prepared out/longbench/prepared-standard.json \
+  --predictions out/longbench/predictions.jsonl \
+  --output out/longbench/scores.json
+```
+
+Scoring rejects duplicate, missing, or unknown source IDs and mixed provider/model configurations. Aggregates remain separate by dataset and metric; unlike metrics are never collapsed into an unexplained overall average.

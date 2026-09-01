@@ -19,6 +19,17 @@ from contextos.baselines import (
 )
 from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
 from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
+from contextos.benchmarks.longbench import (
+    HuggingFaceLongBenchSource,
+    load_longbench_config,
+    load_longbench_predictions,
+    load_prepared_subset,
+    prepare_longbench_subset,
+    score_longbench_predictions,
+    write_prepared_subset,
+    write_score_report,
+)
+from contextos.benchmarks.longbench_models import LongBenchProfile
 from contextos.benchmarks.models import BenchmarkRun
 from contextos.benchmarks.positional import (
     load_positional_dataset,
@@ -45,6 +56,8 @@ benchmark_app = typer.Typer(
     invoke_without_command=True,
 )
 app.add_typer(benchmark_app, name="benchmark")
+longbench_app = typer.Typer(help="Prepare and score the configured LongBench subset.")
+benchmark_app.add_typer(longbench_app, name="longbench")
 store_app = typer.Typer(help="Inspect durable ContextOS stores.")
 app.add_typer(store_app, name="store")
 
@@ -283,6 +296,93 @@ def benchmark_positional_command(
     summary = positional_summary(run)
     summary["artifact"] = str(artifact)
     typer.echo(json.dumps(summary, indent=2, sort_keys=True))
+
+
+@longbench_app.command("prepare")
+def benchmark_longbench_prepare_command(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ] = Path("benchmarks/config/longbench_subset.json"),
+    profile: Annotated[LongBenchProfile, typer.Option("--profile")] = LongBenchProfile.QUICK,
+    output_path: Annotated[Path, typer.Option("--output")] = Path(
+        "out/longbench/prepared-quick.json"
+    ),
+) -> None:
+    """Explicitly download and deterministically prepare external LongBench cases."""
+    try:
+        config = load_longbench_config(config_path)
+        subset = prepare_longbench_subset(
+            config,
+            profile=profile,
+            source=HuggingFaceLongBenchSource(),
+        )
+        artifact = write_prepared_subset(subset, output_path)
+    except (OSError, RuntimeError, ValueError, ValidationError) as exc:
+        typer.echo(f"LongBench preparation failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    counts = {
+        dataset: sum(case.dataset == dataset for case in subset.cases)
+        for dataset in sorted({case.dataset for case in subset.cases})
+    }
+    typer.echo(
+        json.dumps(
+            {
+                "artifact": str(artifact),
+                "profile": subset.profile,
+                "source_repository": subset.source_repository,
+                "source_revision": subset.source_revision,
+                "case_count": len(subset.cases),
+                "cases_by_dataset": counts,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+@longbench_app.command("score")
+def benchmark_longbench_score_command(
+    prepared_path: Annotated[
+        Path,
+        typer.Option("--prepared", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ],
+    predictions_path: Annotated[
+        Path,
+        typer.Option(
+            "--predictions",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ],
+    output_path: Annotated[Path, typer.Option("--output")],
+) -> None:
+    """Score complete ID-keyed predictions with deterministic task metrics."""
+    try:
+        subset = load_prepared_subset(prepared_path)
+        predictions = load_longbench_predictions(predictions_path)
+        report = score_longbench_predictions(subset, predictions)
+        artifact = write_score_report(report, output_path)
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        typer.echo(f"LongBench scoring failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "artifact": str(artifact),
+                "prediction_count": report.prediction_count,
+                "provider": report.provider,
+                "model": report.model,
+                "dataset_aggregates": [
+                    aggregate.model_dump(mode="json") for aggregate in report.dataset_aggregates
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 @app.command()

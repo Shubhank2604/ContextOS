@@ -4,8 +4,16 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
+from contextos.benchmarks.longbench_models import (
+    LongBenchCase,
+    LongBenchMetric,
+    LongBenchPrediction,
+    LongBenchProfile,
+    PreparedLongBenchSubset,
+)
 from contextos.benchmarks.models import BenchmarkRun
 from contextos.benchmarks.positional_models import PositionalRun
 from contextos.cli import app
@@ -219,3 +227,115 @@ def test_cli_positional_openai_requires_explicit_model(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "--model is required" in result.stderr
+
+
+def test_cli_longbench_scores_complete_id_keyed_predictions(tmp_path: Path) -> None:
+    case = LongBenchCase(
+        dataset="hotpotqa",
+        source_id="source-1",
+        input="What is the answer?",
+        context="The answer is ContextOS.",
+        answers=["ContextOS"],
+        source_length=4,
+        language="en",
+        metric=LongBenchMetric.QA_F1,
+        prompt_template="Context: {context}\nQuestion: {input}\nAnswer:",
+        max_output_tokens=32,
+    )
+    subset = PreparedLongBenchSubset(
+        profile=LongBenchProfile.QUICK,
+        source_repository="fixture",
+        source_revision="fixture-revision",
+        source_split="test",
+        sampling_seed=1,
+        cases=[case],
+    )
+    prepared_path = tmp_path / "prepared.json"
+    predictions_path = tmp_path / "predictions.jsonl"
+    output_path = tmp_path / "scores.json"
+    prepared_path.write_text(subset.model_dump_json(indent=2), encoding="utf-8")
+    prediction = LongBenchPrediction(
+        dataset=case.dataset,
+        source_id=case.source_id,
+        prediction="ContextOS",
+        provider="fixture",
+        model="fixture-v1",
+    )
+    predictions_path.write_text(prediction.model_dump_json() + "\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "longbench",
+            "score",
+            "--prepared",
+            str(prepared_path),
+            "--predictions",
+            str(predictions_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["prediction_count"] == 1
+    assert report["dataset_aggregates"][0]["mean_score"] == 1.0
+
+
+def test_cli_longbench_prepare_uses_explicit_external_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_load_task(
+        self: object,
+        repository: str,
+        dataset: str,
+        *,
+        split: str,
+        revision: str,
+    ) -> list[dict[str, object]]:
+        del self, repository, split, revision
+        return [
+            {
+                "_id": f"{dataset}-{index}",
+                "input": "fixture question",
+                "context": "fixture context",
+                "answers": [
+                    f"Paragraph {index}" if dataset == "passage_retrieval_en" else "fixture"
+                ],
+                "length": 2,
+                "language": "en",
+                "all_classes": None,
+            }
+            for index in range(2)
+        ]
+
+    monkeypatch.setattr(
+        "contextos.cli.HuggingFaceLongBenchSource.load_task",
+        fake_load_task,
+    )
+    output_path = tmp_path / "prepared.json"
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "longbench",
+            "prepare",
+            "--profile",
+            "quick",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["case_count"] == 8
+    assert report["cases_by_dataset"] == {
+        "2wikimqa": 2,
+        "hotpotqa": 2,
+        "passage_retrieval_en": 2,
+        "repobench-p": 2,
+    }

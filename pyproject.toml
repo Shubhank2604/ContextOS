@@ -21,7 +21,7 @@ dependencies = [
 semantic = ["sentence-transformers>=3"]
 openai = ["openai>=1"]
 benchmark = [
-    "datasets>=3",
+    "datasets>=3,<4",
     "matplotlib>=3.8",
     "pandas>=2.1",
     "scipy>=1.11",

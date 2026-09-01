@@ -1,6 +1,6 @@
 # Benchmarking Methodology
 
-ContextOS is evaluated against deterministic baselines using project-owned required-fact cases. Phase 4B adds controlled positional retrieval; a selected LongBench subset follows in the next v0.4 phase.
+ContextOS is evaluated against deterministic baselines using project-owned required-fact cases. Phase 4B adds controlled positional retrieval, and Phase 4C adds a configured LongBench subset for external validation.
 
 Raw per-case results and environment metadata—not generated plots—will be the source of truth.
 
@@ -33,3 +33,13 @@ All layouts receive exactly the same records, query, provider/model, decoding bo
 Reports retain accuracy by position and context length, the max-minus-min positional accuracy gap, population variance and standard deviation, estimated and provider-reported input tokens, raw predictions, prompt hashes, cached/output token counts when exposed, and total provider latency. Context buckets beyond the user-declared model limit are skipped and recorded rather than silently truncated.
 
 The deterministic provider is an offline oracle used only to validate dataset, layout, evaluator, aggregation, and artifact plumbing. It is position invariant by design and cannot establish the positional degradation phenomenon. Only a recorded real-provider run may support an empirical claim.
+
+## Phase 4C LongBench subset
+
+The configured subset covers HotpotQA, 2WikiMQA, PassageRetrieval-en, and RepoBench-P from the pinned `zai-org/LongBench` source revision. It represents multi-document QA, synthetic retrieval, and code completion while keeping provider cost tractable.
+
+Sampling ranks preserved `(dataset, _id)` identities with a versioned SHA-256 seed, so quick and standard selections do not depend on upstream row order. Standard contains exactly 100 examples. Full retains every row from the configured tasks. The preparation artifact records repository, revision, split, profile, seed, original IDs, answers, and source length.
+
+The evaluator follows the official LongBench task mapping: normalized English token F1 for the two QA datasets, paragraph-number precision for retrieval, and first uncommented-line similarity for RepoBench-P. Each prediction is scored against all accepted answers and keeps the maximum, matching the official evaluation convention. No LLM judge is used.
+
+Prediction scoring requires complete identity coverage and one provider/model configuration. Phase 4D adds the complete strategy comparison runner; Phase 4C deliberately does not fabricate model predictions when the external dependency or credentials are unavailable.

@@ -4,6 +4,8 @@ ContextOS is a model-agnostic Python runtime for constructing an LLM's next inpu
 
 The v0.4 development benchmark suite now includes ContextOS-Bench and a controlled positional-retrieval experiment inspired by *Lost in the Middle*. Offline runs validate deterministic construction, layout, scoring, and artifact plumbing; empirical model-behavior claims require an explicitly requested real-provider run.
 
+The external-validation adapter configures a reproducible LongBench subset spanning multi-document QA, synthetic passage retrieval, and repository-level code completion. External examples are downloaded only by an explicit command and are not committed to this repository.
+
 The detailed build specification and live project status are maintained locally during development. Checked-in version changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Development setup

@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4C pinned LongBench subset configuration for HotpotQA, 2WikiMQA, PassageRetrieval-en, and RepoBench-P, with deterministic quick/standard/full profiles and preserved source IDs.
+- Lazy explicit Hugging Face preparation, validated local external-data manifests, LongBench-compatible QA F1/retrieval/code metrics, and complete ID-keyed prediction scoring.
+- `contextos benchmark longbench prepare` and `contextos benchmark longbench score`; normal CI remains offline and never downloads external datasets.
 - Phase 4B controlled positional retrieval across 4K, 8K, 16K, and 32K token buckets; five evidence positions; and original, relevance-descending, and ContextOS position-aware layouts.
 - Deterministic exact-match evaluation, positional gap and variance reporting, token and provider-latency measurements, raw immutable artifacts, and an offline-safe positional CLI.
 - Explicit optional OpenAI positional runs with recorded model and context limits; paid provider runs remain opt-in and outside normal CI.

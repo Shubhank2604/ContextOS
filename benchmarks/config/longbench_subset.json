@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "source_repository": "zai-org/LongBench",
+  "source_revision": "5e628be",
+  "source_split": "test",
+  "sampling_seed": 404,
+  "tasks": [
+    {
+      "dataset": "hotpotqa",
+      "family": "multi_document_qa",
+      "metric": "qa_f1",
+      "prompt_template": "Answer the question based on the given passages. Only give me the answer and do not output any other words.\n\nThe following are given passages.\n{context}\n\nAnswer the question based on the given passages. Only give me the answer and do not output any other words.\n\nQuestion: {input}\nAnswer:",
+      "max_output_tokens": 32,
+      "quick_samples": 2,
+      "standard_samples": 25
+    },
+    {
+      "dataset": "2wikimqa",
+      "family": "multi_document_qa",
+      "metric": "qa_f1",
+      "prompt_template": "Answer the question based on the given passages. Only give me the answer and do not output any other words.\n\nThe following are given passages.\n{context}\n\nAnswer the question based on the given passages. Only give me the answer and do not output any other words.\n\nQuestion: {input}\nAnswer:",
+      "max_output_tokens": 32,
+      "quick_samples": 2,
+      "standard_samples": 25
+    },
+    {
+      "dataset": "passage_retrieval_en",
+      "family": "synthetic_passage_retrieval",
+      "metric": "retrieval",
+      "prompt_template": "Here are 30 paragraphs from Wikipedia, along with an abstract. Please determine which paragraph the abstract is from.\n\n{context}\n\nThe following is an abstract.\n\n{input}\n\nPlease enter the number of the paragraph that the abstract is from. The answer format must be like \"Paragraph 1\", \"Paragraph 2\", etc.\n\nThe answer is: ",
+      "max_output_tokens": 32,
+      "quick_samples": 2,
+      "standard_samples": 25
+    },
+    {
+      "dataset": "repobench-p",
+      "family": "code_completion",
+      "metric": "code_similarity",
+      "prompt_template": "Please complete the code given below. \n{context}{input}Next line of code:\n",
+      "max_output_tokens": 64,
+      "quick_samples": 2,
+      "standard_samples": 25
+    }
+  ]
+}
