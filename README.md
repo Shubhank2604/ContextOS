@@ -2,6 +2,8 @@
 
 ContextOS is a model-agnostic Python runtime for constructing an LLM's next input context under a fixed token budget. Version 0.3.0 delivers the integrated runtime: safe deduplication, multi-factor scoring, dependency propagation, deterministic allocation, guarded compression, position-aware layout, complete traces, and SQLite persistence. Benchmark claims will be added only when reproducible result artifacts exist.
 
+The v0.4 development benchmark suite now includes ContextOS-Bench and a controlled positional-retrieval experiment inspired by *Lost in the Middle*. Offline runs validate deterministic construction, layout, scoring, and artifact plumbing; empirical model-behavior claims require an explicitly requested real-provider run.
+
 The detailed build specification and live project status are maintained locally during development. Checked-in version changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Development setup

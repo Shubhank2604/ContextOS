@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4B controlled positional retrieval across 4K, 8K, 16K, and 32K token buckets; five evidence positions; and original, relevance-descending, and ContextOS position-aware layouts.
+- Deterministic exact-match evaluation, positional gap and variance reporting, token and provider-latency measurements, raw immutable artifacts, and an offline-safe positional CLI.
+- Explicit optional OpenAI positional runs with recorded model and context limits; paid provider runs remain opt-in and outside normal CI.
 - Phase 4A ContextOS-Bench schema and deterministic generator with 50 templated base cases across coding, research, and support/operations scenarios.
 - Exact required-fact annotations covering dates, identifiers, changed-number and negation traps, supersession, contradictions, recent noise, and one-/two-hop dependencies.
 - Shared Full Context, Last-N, Sliding Window, and ContextOS benchmark runner with raw task, CIR, token, compression, and latency measurements.

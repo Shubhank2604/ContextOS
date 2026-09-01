@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from contextos.benchmarks.models import BenchmarkRun
+from contextos.benchmarks.positional_models import PositionalRun
 from contextos.cli import app
 from contextos.models import ContextItem, ContextType
 
@@ -175,3 +176,46 @@ def test_cli_benchmark_compare_reports_zero_delta_for_same_run(tmp_path: Path) -
     report = json.loads(comparison.stdout)
     assert report["contextos"]["task_score_delta"] == 0.0
     assert report["contextos"]["cir_delta"] == 0.0
+
+
+def test_cli_positional_quick_run_writes_raw_artifact(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "positional",
+            "--input",
+            "benchmarks/datasets/positional_retrieval.json",
+            "--output-directory",
+            str(tmp_path),
+            "--profile",
+            "quick",
+            "--provider",
+            "deterministic",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    artifact = Path(report["artifact"])
+    run = PositionalRun.model_validate_json(artifact.read_text(encoding="utf-8"))
+    assert report["prediction_count"] == 15
+    assert run.executed_context_lengths == [4_096]
+    assert len(run.robustness) == 3
+
+
+def test_cli_positional_openai_requires_explicit_model(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "positional",
+            "--output-directory",
+            str(tmp_path),
+            "--provider",
+            "openai",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--model is required" in result.stderr

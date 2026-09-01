@@ -20,10 +20,18 @@ from contextos.baselines import (
 from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
 from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
 from contextos.benchmarks.models import BenchmarkRun
+from contextos.benchmarks.positional import (
+    load_positional_dataset,
+    positional_summary,
+    run_positional_benchmark,
+    write_positional_run_artifact,
+)
+from contextos.benchmarks.positional_models import PositionalDataset
 from contextos.benchmarks.runner import run_contextos_bench
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
 from contextos.models import ContextEdge, ContextItem
+from contextos.providers import DeterministicRetrievalProvider, LLMProvider, OpenAIProvider
 from contextos.store import SQLiteContextStore
 from contextos.tokenization import TiktokenTokenizer
 
@@ -48,6 +56,13 @@ class BaselineName(StrEnum):
     FULL = "full"
     LAST_N = "last-n"
     SLIDING_WINDOW = "sliding-window"
+
+
+class PositionalProviderName(StrEnum):
+    """Explicit providers available for the controlled positional experiment."""
+
+    DETERMINISTIC = "deterministic"
+    OPENAI = "openai"
 
 
 @app.callback()
@@ -202,6 +217,72 @@ def benchmark_run_command(
             sort_keys=True,
         )
     )
+
+
+@benchmark_app.command("positional")
+def benchmark_positional_command(
+    input_path: Annotated[
+        Path,
+        typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
+    ] = Path("benchmarks/datasets/positional_retrieval.json"),
+    output_directory: Annotated[Path, typer.Option("--output-directory")] = Path(
+        "benchmarks/results"
+    ),
+    profile: Annotated[str, typer.Option("--profile")] = "quick",
+    provider_name: Annotated[
+        PositionalProviderName,
+        typer.Option("--provider"),
+    ] = PositionalProviderName.DETERMINISTIC,
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    max_context_tokens: Annotated[
+        int,
+        typer.Option("--max-context-tokens", min=288),
+    ] = 32_800,
+) -> None:
+    """Run the controlled positional-retrieval experiment."""
+    try:
+        if profile not in {"quick", "full"}:
+            raise ValueError("positional profile must be 'quick' or 'full'")
+        dataset = load_positional_dataset(input_path)
+        if profile == "quick":
+            shortest = min(case.target_context_tokens for case in dataset.cases)
+            dataset = PositionalDataset(
+                name=dataset.name,
+                generator_version=dataset.generator_version,
+                generation_seed=dataset.generation_seed,
+                cases=[
+                    case
+                    for case in dataset.cases
+                    if case.target_context_tokens == shortest and case.repetition == 0
+                ],
+            )
+        provider: LLMProvider
+        if provider_name is PositionalProviderName.OPENAI:
+            if model is None or not model.strip():
+                raise ValueError("--model is required for an OpenAI positional run")
+            provider = OpenAIProvider(model=model, temperature=0.0)
+            provider_model = model
+        else:
+            if model is not None:
+                raise ValueError("--model is valid only with --provider openai")
+            provider = DeterministicRetrievalProvider()
+            provider_model = provider.model
+        run = run_positional_benchmark(
+            dataset,
+            provider=provider,
+            provider_name=provider_name.value,
+            provider_model=provider_model,
+            tokenizer=TiktokenTokenizer(),
+            profile=profile,
+            max_context_tokens=max_context_tokens,
+        )
+        artifact = write_positional_run_artifact(run, output_directory)
+    except (ContextOSError, OSError, ValueError, ValidationError) as exc:
+        typer.echo(f"Positional benchmark failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    summary = positional_summary(run)
+    summary["artifact"] = str(artifact)
+    typer.echo(json.dumps(summary, indent=2, sort_keys=True))
 
 
 @app.command()

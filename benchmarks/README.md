@@ -39,3 +39,27 @@ The shared runner evaluates Full Context, Last-N, Sliding Window, and ContextOS.
 Aggregate reports retain p50/p95 optimizer latency and deterministic bootstrap 95% confidence intervals when at least 20 successful cases are available. Generated artifacts are content-addressed and ignored by default until a later validation phase explicitly approves an immutable result for version control. No benchmark result is hand-authored.
 
 `datasets/deduplication_cases.json` remains the focused deduplication regression fixture.
+
+## Controlled positional retrieval
+
+`datasets/positional_retrieval.json` is a compact deterministic parameter grid covering 4K, 8K, 16K, and 32K token targets and evidence at the beginning, 25%, middle, 75%, and end. It compares identical records under original/full, relevance-descending, and the production ContextOS position-aware layout.
+
+Run the offline plumbing check without credentials:
+
+```bash
+contextos benchmark positional --profile quick --provider deterministic --output-directory out/positional-quick
+```
+
+Run the complete grid against an explicitly selected OpenAI model only when credentials and the stated provider context limit are available:
+
+```bash
+contextos benchmark positional --profile full --provider openai --model MODEL_ID --max-context-tokens MODEL_CONTEXT_LIMIT --output-directory out/positional-real
+```
+
+The real-provider command requires `OPENAI_API_KEY` and the `openai` optional dependency. Unsupported context lengths are recorded as skipped. Artifacts retain raw predictions, exact-match results, token counts, prompt hashes, model identity, total provider latency, and positional aggregates. Offline deterministic accuracy is not evidence about long-context model behavior.
+
+Regenerate the parameter grid with:
+
+```bash
+python -m contextos.benchmarks.positional --output benchmarks/datasets/positional_retrieval.json
+```

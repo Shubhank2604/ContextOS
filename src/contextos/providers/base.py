@@ -13,6 +13,8 @@ class ProviderResponse(BaseModel):
     text: str
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
+    cached_tokens: int | None = Field(default=None, ge=0)
+    ttft_ms: float | None = Field(default=None, ge=0.0)
     model: str | None = None
 
 

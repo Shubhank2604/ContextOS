@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "name": "contextos-positional-retrieval",
+  "generator_version": "1.0.0",
+  "generation_seed": 2409,
+  "cases": [
+    {
+      "schema_version": "1.0",
+      "id": "pos-04k-beginning-r00",
+      "target_context_tokens": 4096,
+      "evidence_position": "beginning",
+      "repetition": 0,
+      "seed": 416105,
+      "target_key": "TARGET_2756C8670FF2",
+      "expected_value": "ANSWER_2756C8670FF2"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-04k-25pct-r00",
+      "target_context_tokens": 4096,
+      "evidence_position": "25_percent",
+      "repetition": 0,
+      "seed": 416130,
+      "target_key": "TARGET_5F121D9A4E8F",
+      "expected_value": "ANSWER_5F121D9A4E8F"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-04k-middle-r00",
+      "target_context_tokens": 4096,
+      "evidence_position": "middle",
+      "repetition": 0,
+      "seed": 416155,
+      "target_key": "TARGET_A843D8ECCF94",
+      "expected_value": "ANSWER_A843D8ECCF94"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-04k-75pct-r00",
+      "target_context_tokens": 4096,
+      "evidence_position": "75_percent",
+      "repetition": 0,
+      "seed": 416180,
+      "target_key": "TARGET_E7864A6F04B8",
+      "expected_value": "ANSWER_E7864A6F04B8"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-04k-end-r00",
+      "target_context_tokens": 4096,
+      "evidence_position": "end",
+      "repetition": 0,
+      "seed": 416205,
+      "target_key": "TARGET_15108AC3691C",
+      "expected_value": "ANSWER_15108AC3691C"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-08k-beginning-r00",
+      "target_context_tokens": 8192,
+      "evidence_position": "beginning",
+      "repetition": 0,
+      "seed": 829801,
+      "target_key": "TARGET_6FDFB262E956",
+      "expected_value": "ANSWER_6FDFB262E956"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-08k-25pct-r00",
+      "target_context_tokens": 8192,
+      "evidence_position": "25_percent",
+      "repetition": 0,
+      "seed": 829826,
+      "target_key": "TARGET_6C93AC565623",
+      "expected_value": "ANSWER_6C93AC565623"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-08k-middle-r00",
+      "target_context_tokens": 8192,
+      "evidence_position": "middle",
+      "repetition": 0,
+      "seed": 829851,
+      "target_key": "TARGET_3B211FF7C195",
+      "expected_value": "ANSWER_3B211FF7C195"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-08k-75pct-r00",
+      "target_context_tokens": 8192,
+      "evidence_position": "75_percent",
+      "repetition": 0,
+      "seed": 829876,
+      "target_key": "TARGET_304C71E4BF2F",
+      "expected_value": "ANSWER_304C71E4BF2F"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-08k-end-r00",
+      "target_context_tokens": 8192,
+      "evidence_position": "end",
+      "repetition": 0,
+      "seed": 829901,
+      "target_key": "TARGET_2DD316286C27",
+      "expected_value": "ANSWER_2DD316286C27"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-16k-beginning-r00",
+      "target_context_tokens": 16384,
+      "evidence_position": "beginning",
+      "repetition": 0,
+      "seed": 1657193,
+      "target_key": "TARGET_5CA6206AE86F",
+      "expected_value": "ANSWER_5CA6206AE86F"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-16k-25pct-r00",
+      "target_context_tokens": 16384,
+      "evidence_position": "25_percent",
+      "repetition": 0,
+      "seed": 1657218,
+      "target_key": "TARGET_7C59BE235158",
+      "expected_value": "ANSWER_7C59BE235158"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-16k-middle-r00",
+      "target_context_tokens": 16384,
+      "evidence_position": "middle",
+      "repetition": 0,
+      "seed": 1657243,
+      "target_key": "TARGET_490DE5FB1BDD",
+      "expected_value": "ANSWER_490DE5FB1BDD"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-16k-75pct-r00",
+      "target_context_tokens": 16384,
+      "evidence_position": "75_percent",
+      "repetition": 0,
+      "seed": 1657268,
+      "target_key": "TARGET_023556A61215",
+      "expected_value": "ANSWER_023556A61215"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-16k-end-r00",
+      "target_context_tokens": 16384,
+      "evidence_position": "end",
+      "repetition": 0,
+      "seed": 1657293,
+      "target_key": "TARGET_0432BFE2A5E0",
+      "expected_value": "ANSWER_0432BFE2A5E0"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-32k-beginning-r00",
+      "target_context_tokens": 32768,
+      "evidence_position": "beginning",
+      "repetition": 0,
+      "seed": 3311977,
+      "target_key": "TARGET_D36922F75D46",
+      "expected_value": "ANSWER_D36922F75D46"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-32k-25pct-r00",
+      "target_context_tokens": 32768,
+      "evidence_position": "25_percent",
+      "repetition": 0,
+      "seed": 3312002,
+      "target_key": "TARGET_592FB08BD68D",
+      "expected_value": "ANSWER_592FB08BD68D"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-32k-middle-r00",
+      "target_context_tokens": 32768,
+      "evidence_position": "middle",
+      "repetition": 0,
+      "seed": 3312027,
+      "target_key": "TARGET_C8C065260947",
+      "expected_value": "ANSWER_C8C065260947"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-32k-75pct-r00",
+      "target_context_tokens": 32768,
+      "evidence_position": "75_percent",
+      "repetition": 0,
+      "seed": 3312052,
+      "target_key": "TARGET_5E51BA6DB410",
+      "expected_value": "ANSWER_5E51BA6DB410"
+    },
+    {
+      "schema_version": "1.0",
+      "id": "pos-32k-end-r00",
+      "target_context_tokens": 32768,
+      "evidence_position": "end",
+      "repetition": 0,
+      "seed": 3312077,
+      "target_key": "TARGET_16732BB17B04",
+      "expected_value": "ANSWER_16732BB17B04"
+    }
+  ]
+}

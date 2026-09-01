@@ -18,5 +18,7 @@ def test_openai_provider_requires_explicit_model_and_key(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ValueError):
         OpenAIProvider(model=" ")
+    with pytest.raises(ValueError, match="temperature"):
+        OpenAIProvider(model="configured-benchmark-model", temperature=2.1)
     with pytest.raises(LLMProviderError, match="OPENAI_API_KEY"):
         OpenAIProvider(model="configured-benchmark-model").complete("prompt", max_output_tokens=8)

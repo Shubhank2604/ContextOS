@@ -1,0 +1,53 @@
+name: Positional benchmark (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: OpenAI model identifier
+        required: true
+        type: string
+      profile:
+        description: Controlled experiment profile
+        required: true
+        default: quick
+        type: choice
+        options:
+          - quick
+          - full
+      max_context_tokens:
+        description: Declared model context limit, including the bounded answer
+        required: true
+        default: "32800"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  positional-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[openai]"
+      - name: Run explicitly requested paid-provider benchmark
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: >-
+          contextos benchmark positional
+          --profile "${{ inputs.profile }}"
+          --provider openai
+          --model "${{ inputs.model }}"
+          --max-context-tokens "${{ inputs.max_context_tokens }}"
+          --output-directory benchmark-output
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: positional-${{ github.run_id }}
+          path: benchmark-output/
+          if-no-files-found: warn
