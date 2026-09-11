@@ -119,6 +119,12 @@ contextos benchmark longbench score \
 
 Scoring rejects duplicate, missing, or unknown source IDs and mixed provider/model configurations. Aggregates remain separate by dataset and metric; unlike metrics are never collapsed into an unexplained overall average.
 
+### Statistical reporting
+
+ContextOS-Bench and LongBench retain exact per-case scores and calculate deterministic, 1,000-resample percentile-bootstrap 95% confidence intervals when at least 20 successful cases are available. Comparative intervals bootstrap paired, within-case candidate-minus-reference deltas. Reports include ContextOS directly against each simple baseline as well as the common Full Context reference.
+
+The positional grid has one observation per experimental cell and the deduplication development fixture has 10 cases, so those reports explicitly omit confidence intervals. Real-model runs use temperature `0`, record provider/model/time and decoding settings, and are repeated only if residual nondeterminism could materially change a conclusion. Do not compare different model or decoding configurations as evidence of a ContextOS effect.
+
 ### Six-strategy provider comparison
 
 Run all required strategies against one explicitly selected OpenAI configuration:

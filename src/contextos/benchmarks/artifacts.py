@@ -5,6 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from contextos.benchmarks.bundles import capture_environment, write_benchmark_bundle
+from contextos.benchmarks.metrics import (
+    DEFAULT_BOOTSTRAP_RESAMPLES,
+    MIN_BOOTSTRAP_SAMPLE_SIZE,
+)
 from contextos.benchmarks.models import BenchmarkRun, ContextOSBenchDataset
 from contextos.embeddings import DeterministicEmbeddingProvider
 
@@ -34,6 +38,29 @@ def _report(run: BenchmarkRun, *, profile: str, strategy_label: str) -> str:
         f"{aggregate.p95_optimizer_latency_ms:.3f} |"
         for aggregate in run.aggregates
     )
+    if run.paired_comparisons:
+        lines.extend(
+            [
+                "",
+                "## Paired deltas",
+                "",
+                "Candidate minus reference; intervals are omitted below 20 paired cases.",
+                "",
+                "| Reference | Candidate | Metric | Cases | Mean delta | 95% CI |",
+                "|---|---|---|---:|---:|---|",
+            ]
+        )
+        lines.extend(
+            "| "
+            f"{value.reference_strategy} | {value.candidate_strategy} | {value.metric} | "
+            f"{value.case_count} | {value.mean_delta:.4f} | "
+            + (
+                f"[{value.delta_ci95.low:.4f}, {value.delta_ci95.high:.4f}] |"
+                if value.delta_ci95 is not None
+                else "not reported |"
+            )
+            for value in run.paired_comparisons
+        )
     lines.extend(
         [
             "",
@@ -72,12 +99,29 @@ def write_run_artifact(
         "strategy_group": strategy_label,
         "strategies": run.strategies,
         "metadata": run.metadata,
+        "statistics": {
+            "method": "percentile bootstrap; paired for strategy deltas",
+            "confidence_level": 0.95,
+            "resamples": DEFAULT_BOOTSTRAP_RESAMPLES,
+            "minimum_sample_size": MIN_BOOTSTRAP_SAMPLE_SIZE,
+        },
     }
     metrics = {
-        "schema_version": "1.0",
+        "schema_version": run.schema_version,
         "run_id": run.run_id,
         "aggregates": [aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+        "paired_comparisons": [
+            comparison.model_dump(mode="json") for comparison in run.paired_comparisons
+        ],
     }
+    metric_rows = [
+        {"record_type": "aggregate", **aggregate.model_dump(mode="json")}
+        for aggregate in run.aggregates
+    ]
+    metric_rows.extend(
+        {"record_type": "paired_comparison", **comparison.model_dump(mode="json")}
+        for comparison in run.paired_comparisons
+    )
     return write_benchmark_bundle(
         output_directory=output_directory,
         recorded_at_utc=run.recorded_at_utc,
@@ -88,6 +132,6 @@ def write_run_artifact(
         cases=cases,
         predictions=run.measurements,
         metrics=metrics,
-        metric_rows=[aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+        metric_rows=metric_rows,
         report=_report(run, profile=profile, strategy_label=strategy_label),
     )

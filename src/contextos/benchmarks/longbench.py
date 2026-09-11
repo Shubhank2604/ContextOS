@@ -23,12 +23,18 @@ from contextos.benchmarks.longbench_models import (
     LongBenchCaseScore,
     LongBenchDatasetAggregate,
     LongBenchMetric,
+    LongBenchPairedComparison,
     LongBenchPrediction,
     LongBenchProfile,
     LongBenchScoreReport,
     LongBenchSubsetConfig,
     LongBenchTaskConfig,
     PreparedLongBenchSubset,
+)
+from contextos.benchmarks.metrics import (
+    DEFAULT_BOOTSTRAP_RESAMPLES,
+    MIN_BOOTSTRAP_SAMPLE_SIZE,
+    bootstrap_mean_ci,
 )
 from contextos.embeddings import DeterministicEmbeddingProvider
 
@@ -339,6 +345,7 @@ def score_longbench_predictions(
         )
         for score in raw_case_scores
     ]
+    prepared_sha = hashlib.sha256(subset.model_dump_json().encode()).hexdigest()
     aggregates: list[LongBenchDatasetAggregate] = []
     for dataset, strategy in sorted({(score.dataset, score.strategy) for score in case_scores}):
         aggregate_scores = [
@@ -354,6 +361,9 @@ def score_longbench_predictions(
             for score in successful_scores
             if score.quality_retention is not None
         ]
+        score_values = [score.score for score in successful_scores if score.score is not None]
+        seed_material = f"{prepared_sha}|{dataset}|{strategy}|{aggregate_scores[0].metric}".encode()
+        aggregate_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:4], "big")
         aggregates.append(
             LongBenchDatasetAggregate(
                 dataset=dataset,
@@ -361,15 +371,72 @@ def score_longbench_predictions(
                 metric=aggregate_scores[0].metric,
                 case_count=len(aggregate_scores),
                 successful_case_count=len(successful_scores),
-                mean_score=(
-                    mean(score.score for score in successful_scores if score.score is not None)
-                    if successful_scores
+                mean_score=(mean(score_values) if score_values else None),
+                mean_quality_retention=(mean(quality_retentions) if quality_retentions else None),
+                score_ci95=(
+                    bootstrap_mean_ci(score_values, seed=aggregate_seed)
+                    if len(score_values) >= MIN_BOOTSTRAP_SAMPLE_SIZE
                     else None
                 ),
-                mean_quality_retention=(mean(quality_retentions) if quality_retentions else None),
+                quality_retention_ci95=(
+                    bootstrap_mean_ci(quality_retentions, seed=aggregate_seed + 1)
+                    if len(quality_retentions) >= MIN_BOOTSTRAP_SAMPLE_SIZE
+                    else None
+                ),
             )
         )
-    prepared_sha = hashlib.sha256(subset.model_dump_json().encode()).hexdigest()
+    paired_comparisons: list[LongBenchPairedComparison] = []
+    datasets = sorted({score.dataset for score in case_scores})
+    for dataset in datasets:
+        dataset_scores = [score for score in case_scores if score.dataset == dataset]
+        available_strategies = {score.strategy for score in dataset_scores}
+        comparison_pairs = [
+            ("full_context", candidate)
+            for candidate in sorted(available_strategies - {"full_context"})
+        ]
+        comparison_pairs.extend(
+            (baseline, "contextos")
+            for baseline in sorted(available_strategies - {"full_context", "contextos"})
+        )
+        for reference_strategy, candidate in comparison_pairs:
+            reference: dict[str, float] = {
+                score.source_id: score.score
+                for score in dataset_scores
+                if score.strategy == reference_strategy
+                and score.status == "ok"
+                and score.score is not None
+            }
+            candidate_scores: dict[str, float] = {
+                score.source_id: score.score
+                for score in dataset_scores
+                if score.strategy == candidate and score.status == "ok" and score.score is not None
+            }
+            shared_ids = sorted(set(reference) & set(candidate_scores))
+            deltas = [
+                candidate_scores[source_id] - reference[source_id] for source_id in shared_ids
+            ]
+            if not deltas:
+                continue
+            metric = dataset_scores[0].metric
+            seed_material = (
+                f"{prepared_sha}|{dataset}|{reference_strategy}|{candidate}|{metric}".encode()
+            )
+            comparison_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:4], "big")
+            paired_comparisons.append(
+                LongBenchPairedComparison(
+                    dataset=dataset,
+                    reference_strategy=reference_strategy,
+                    candidate_strategy=candidate,
+                    metric=metric,
+                    case_count=len(deltas),
+                    mean_score_delta=mean(deltas) if deltas else 0.0,
+                    score_delta_ci95=(
+                        bootstrap_mean_ci(deltas, seed=comparison_seed)
+                        if len(deltas) >= MIN_BOOTSTRAP_SAMPLE_SIZE
+                        else None
+                    ),
+                )
+            )
     return LongBenchScoreReport(
         prepared_sha256=prepared_sha,
         prediction_count=len(predictions),
@@ -377,6 +444,7 @@ def score_longbench_predictions(
         model=next(iter(models)),
         case_scores=case_scores,
         dataset_aggregates=aggregates,
+        paired_comparisons=paired_comparisons,
     )
 
 
@@ -416,6 +484,13 @@ def write_longbench_bundle(
         "model": report.model,
         "strategies": strategies,
         "execution": dict(execution_config),
+        "statistics": {
+            "method": "percentile bootstrap; paired for strategy deltas",
+            "confidence_level": 0.95,
+            "resamples": DEFAULT_BOOTSTRAP_RESAMPLES,
+            "minimum_sample_size": MIN_BOOTSTRAP_SAMPLE_SIZE,
+            "repeat_policy": "repeat only when model nondeterminism could change the conclusion",
+        },
     }
     metrics = {
         "schema_version": report.schema_version,
@@ -424,6 +499,9 @@ def write_longbench_bundle(
         "case_scores": [score.model_dump(mode="json") for score in report.case_scores],
         "dataset_aggregates": [
             aggregate.model_dump(mode="json") for aggregate in report.dataset_aggregates
+        ],
+        "paired_comparisons": [
+            comparison.model_dump(mode="json") for comparison in report.paired_comparisons
         ],
     }
     report_lines = [
@@ -445,6 +523,30 @@ def write_longbench_bundle(
         f"{value.mean_quality_retention if value.mean_quality_retention is not None else 'n/a'} |"
         for value in report.dataset_aggregates
     )
+    if report.paired_comparisons:
+        report_lines.extend(
+            [
+                "",
+                "## Paired score deltas",
+                "",
+                "Candidate minus reference; confidence intervals require 20 paired cases.",
+                "",
+                "| Dataset | Reference | Candidate | Cases | Mean delta | 95% CI |",
+                "|---|---|---|---:|---:|---|",
+            ]
+        )
+        report_lines.extend(
+            "| "
+            f"{value.dataset} | {value.reference_strategy} | {value.candidate_strategy} | "
+            f"{value.case_count} | "
+            f"{value.mean_score_delta:.4f} | "
+            + (
+                f"[{value.score_delta_ci95.low:.4f}, {value.score_delta_ci95.high:.4f}] |"
+                if value.score_delta_ci95 is not None
+                else "not reported |"
+            )
+            for value in report.paired_comparisons
+        )
     report_lines.extend(
         [
             "",
@@ -461,6 +563,15 @@ def write_longbench_bundle(
         cases=subset.cases,
         predictions=predictions,
         metrics=metrics,
-        metric_rows=[value.model_dump(mode="json") for value in report.dataset_aggregates],
+        metric_rows=[
+            *(
+                {"record_type": "aggregate", **value.model_dump(mode="json")}
+                for value in report.dataset_aggregates
+            ),
+            *(
+                {"record_type": "paired_comparison", **value.model_dump(mode="json")}
+                for value in report.paired_comparisons
+            ),
+        ],
         report="\n".join(report_lines),
     )

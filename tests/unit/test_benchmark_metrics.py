@@ -1,5 +1,6 @@
 """Deterministic metric, aggregation, and artifact tests."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -54,6 +55,8 @@ def test_runner_scores_full_reference_and_contextos_on_same_case() -> None:
     assert measurements["contextos"].input_tokens <= measurements["contextos"].effective_budget
     assert measurements["contextos"].selected_items
     assert measurements["contextos"].decision_reasons
+    assert len(run.paired_comparisons) == 27
+    assert all(comparison.delta_ci95 is None for comparison in run.paired_comparisons)
 
 
 def test_run_artifacts_are_content_addressed_and_immutable(tmp_path: Path) -> None:
@@ -80,6 +83,8 @@ def test_run_artifacts_are_content_addressed_and_immutable(tmp_path: Path) -> No
     )
     assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
     assert path.name.endswith("-comparison-limited-1")
+    config = json.loads((path / "config.json").read_text(encoding="utf-8"))
+    assert config["statistics"]["minimum_sample_size"] == 20
     conflicting = run.model_copy(update={"metadata": {**run.metadata, "different": True}})
     with pytest.raises(ValueError, match="collision"):
         write_run_artifact(

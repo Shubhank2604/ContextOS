@@ -233,6 +233,19 @@ class BenchmarkAggregate(BaseModel):
     cir_ci95: ConfidenceInterval | None = None
 
 
+class PairedMetricComparison(BaseModel):
+    """Per-case paired strategy delta with an optional bootstrap interval."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reference_strategy: str
+    candidate_strategy: str
+    metric: str
+    case_count: int = Field(ge=0)
+    mean_delta: float
+    delta_ci95: ConfidenceInterval | None = None
+
+
 class BenchmarkRun(BaseModel):
     """Complete immutable benchmark artifact payload."""
 
@@ -249,4 +262,5 @@ class BenchmarkRun(BaseModel):
     strategies: list[str]
     measurements: list[BenchmarkMeasurement]
     aggregates: list[BenchmarkAggregate]
+    paired_comparisons: list[PairedMetricComparison] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)

@@ -23,6 +23,7 @@ from contextos.benchmarks.metrics import (
     aggregate_measurements,
     failed_measurement,
     measurement_from_result,
+    paired_metric_comparisons,
 )
 from contextos.benchmarks.models import (
     BenchmarkMeasurement,
@@ -252,6 +253,32 @@ def run_contextos_bench(
         ]
     )
     run_id = hashlib.sha256(identity_payload.encode("utf-8")).hexdigest()[:20]
+    reference_strategy = (
+        "contextos_full"
+        if "contextos_full" in strategy_names
+        else "full_context"
+        if "full_context" in strategy_names
+        else None
+    )
+    paired_comparisons = (
+        paired_metric_comparisons(
+            measurements,
+            reference_strategy=reference_strategy,
+            bootstrap_seed=dataset.generation_seed,
+        )
+        if reference_strategy is not None
+        else []
+    )
+    if reference_strategy == "full_context" and "contextos" in strategy_names:
+        for baseline in sorted(set(strategy_names) - {"full_context", "contextos"}):
+            paired_comparisons.extend(
+                paired_metric_comparisons(
+                    measurements,
+                    reference_strategy=baseline,
+                    candidate_strategies=("contextos",),
+                    bootstrap_seed=dataset.generation_seed,
+                )
+            )
     return BenchmarkRun(
         run_id=run_id,
         recorded_at_utc=datetime.fromisoformat(recorded_at),
@@ -266,6 +293,7 @@ def run_contextos_bench(
             measurements,
             bootstrap_seed=dataset.generation_seed,
         ),
+        paired_comparisons=paired_comparisons,
         metadata={
             "case_count": len(selected_cases),
             "base_case_count": sum(case in dataset.base_cases for case in selected_cases),

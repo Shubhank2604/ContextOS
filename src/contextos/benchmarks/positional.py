@@ -434,6 +434,11 @@ def write_positional_run_artifact(
         "skipped_context_lengths": run.skipped_context_lengths,
         "strategies": [strategy.value for strategy in run.strategies],
         "metadata": run.metadata,
+        "statistics": {
+            "confidence_interval": "not reported",
+            "reason": "one observation per context-length, position, and strategy cell",
+            "repeat_policy": "repeat only when model nondeterminism could change the conclusion",
+        },
     }
     metrics = {
         "schema_version": "1.0",
@@ -448,6 +453,7 @@ def write_positional_run_artifact(
         f"- Provider/model: `{run.provider}/{run.model}`",
         f"- Profile: `{run.profile}`",
         f"- Predictions: {len(run.predictions)}",
+        "- Confidence intervals: not reported (one observation per experimental cell)",
         "",
         "| Strategy | Target tokens | Accuracy | Max-min gap |",
         "|---|---:|---:|---:|",

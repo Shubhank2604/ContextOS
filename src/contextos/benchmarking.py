@@ -173,6 +173,10 @@ def write_deduplication_benchmark_bundle(
             "profile": "fixture",
             "fixture_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
             "semantic_threshold": threshold,
+            "statistics": {
+                "confidence_interval": "not reported",
+                "reason": "the labeled development fixture has only 10 cases",
+            },
         },
         environment=capture_environment(
             recorded_at_utc=recorded_at,

@@ -19,6 +19,7 @@ from contextos.benchmarks.models import (
     ConfidenceInterval,
     ContextOSBenchCase,
     ContextOSBenchDataset,
+    PairedMetricComparison,
     RequiredFact,
     TaskMetric,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "ContextOSBenchCase",
     "ContextOSBenchDataset",
     "LoadedBenchmarkBundle",
+    "PairedMetricComparison",
     "RequiredFact",
     "TaskMetric",
     "ablation_effects",

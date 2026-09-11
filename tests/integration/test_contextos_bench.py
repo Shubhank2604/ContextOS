@@ -18,6 +18,20 @@ def test_all_fifty_base_cases_produce_raw_results_and_confidence_intervals() -> 
     assert all(aggregate.case_count == 50 for aggregate in run.aggregates)
     assert all(aggregate.task_score_ci95 is not None for aggregate in run.aggregates)
     assert all(aggregate.cir_ci95 is not None for aggregate in run.aggregates)
+    assert len(run.paired_comparisons) == 27
+    assert all(comparison.case_count == 50 for comparison in run.paired_comparisons)
+    assert all(comparison.delta_ci95 is not None for comparison in run.paired_comparisons)
+    assert {
+        comparison.reference_strategy
+        for comparison in run.paired_comparisons
+        if comparison.candidate_strategy == "contextos"
+    } == {
+        "full_context",
+        "last_n",
+        "naive_extractive",
+        "relevance_only",
+        "sliding_window",
+    }
     contextos = next(aggregate for aggregate in run.aggregates if aggregate.strategy == "contextos")
     assert contextos.successful_case_count == 50
     assert contextos.mean_task_specific_score >= 0.0

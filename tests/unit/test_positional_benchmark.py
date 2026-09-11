@@ -1,5 +1,6 @@
 """Controlled positional-retrieval generation, evaluation, and artifact tests."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -149,6 +150,8 @@ def test_positional_artifacts_are_immutable(tmp_path: Path) -> None:
 
     assert path == write_positional_run_artifact(run, tmp_path, dataset=dataset)
     assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
+    config = json.loads((path / "config.json").read_text(encoding="utf-8"))
+    assert config["statistics"]["confidence_interval"] == "not reported"
     conflicting = run.model_copy(update={"provider": "different"})
     with pytest.raises(ValueError, match="collision"):
         write_positional_run_artifact(conflicting, tmp_path, dataset=dataset)

@@ -157,6 +157,39 @@ def test_scoring_joins_preserved_ids_and_keeps_metrics_separate() -> None:
         score_longbench_predictions(subset, mixed)
 
 
+def test_standard_profile_reports_reproducible_bootstrap_intervals() -> None:
+    subset = prepare_longbench_subset(
+        _config(),
+        profile=LongBenchProfile.STANDARD,
+        source=FakeLongBenchSource(),
+    )
+    predictions = [
+        LongBenchPrediction(
+            dataset=case.dataset,
+            source_id=case.source_id,
+            strategy=strategy,
+            prediction=case.answers[0],
+            provider="fixture",
+            model="fixture-v1",
+        )
+        for case in subset.cases
+        for strategy in ("full_context", "contextos")
+    ]
+
+    first = score_longbench_predictions(subset, predictions)
+    second = score_longbench_predictions(subset, predictions)
+
+    assert first == second
+    assert all(aggregate.score_ci95 is not None for aggregate in first.dataset_aggregates)
+    assert all(
+        aggregate.quality_retention_ci95 is not None for aggregate in first.dataset_aggregates
+    )
+    assert len(first.paired_comparisons) == 4
+    assert all(comparison.case_count == 25 for comparison in first.paired_comparisons)
+    assert all(comparison.mean_score_delta == 0.0 for comparison in first.paired_comparisons)
+    assert all(comparison.score_delta_ci95 is not None for comparison in first.paired_comparisons)
+
+
 def test_prepared_output_refuses_conflicting_overwrites(tmp_path: Path) -> None:
     subset = prepare_longbench_subset(
         _config(),

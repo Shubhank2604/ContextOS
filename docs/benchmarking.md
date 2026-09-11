@@ -24,6 +24,18 @@ Full Context is executed with enough budget to provide the quality reference. Bu
 
 Every run retains raw per-case results. Aggregates are derived from successful cases, keep unlike metrics separate, report p50/p95 optimizer latency, and use a seeded percentile bootstrap for 95% confidence intervals when at least 20 cases are available.
 
+## Phase 4G statistical protocol
+
+ContextOS-Bench reports 1,000-resample, seeded percentile-bootstrap 95% confidence intervals for aggregate task score and Critical Information Recall when at least 20 successful cases are available. Strategy deltas are calculated within each shared case before bootstrapping, so pairing is preserved. Reports include every constrained strategy minus Full Context and, separately, ContextOS minus each simple baseline. Input-token deltas remain signed: a negative value means the candidate used fewer tokens.
+
+LongBench uses the same 20-case threshold and paired bootstrap independently within each dataset and official task metric. It reports score and quality-retention intervals per dataset/strategy, every candidate minus Full Context, and ContextOS minus each simple baseline. It never combines QA F1, retrieval precision, and code similarity into one unexplained score. Failed cases and Full Context overflows remain in raw predictions but do not enter a successful-case interval; the paired sample count is always reported.
+
+The positional experiment currently has one observation per context-length, evidence-position, and strategy cell, while the labeled deduplication development fixture has 10 cases. Neither supports a reported confidence interval under this protocol, so their artifacts state `not reported` and give the reason. No interval is fabricated from token-level or position-level pseudo-replication.
+
+Real-model runners use temperature `0` where the provider supports it. Every immutable bundle records UTC date/time, provider, model, decoding configuration when executed by ContextOS, and the environment needed to identify the run. Imported LongBench prediction files record provider/model but cannot prove an unrecorded decoding configuration; comparative claims from imported data therefore require matching external provenance. Results from different provider, model, prompt, evaluator, case set, or decoding configurations must be treated as separate experiments and must never be attributed to ContextOS.
+
+Runs are not repeated mechanically. A critical comparison is repeated with the identical configuration only when residual model nondeterminism is large enough to change the qualitative conclusion; every repetition remains a separate immutable bundle. Deterministic evaluators and seeded bootstrap calculations are reproducible from the retained per-case records.
+
 ## Phase 4B controlled positional experiment
 
 This is a **controlled reproduction inspired by the paper**, not a reproduction of every experiment in *Lost in the Middle*. It tests exact key-value retrieval while varying target input length (4K, 8K, 16K, and 32K tokens), original evidence position (beginning, 25%, middle, 75%, and end), and layout (original/full, relevance descending, and ContextOS position aware).

@@ -155,7 +155,10 @@ def test_cli_deduplication_benchmark_runs_end_to_end(tmp_path: Path) -> None:
     assert report["case_count"] == 10
     assert report["false_positive"] == 0
     assert report["f1"] == 1.0
-    assert {entry.name for entry in Path(report["artifact"]).iterdir()} == REQUIRED_BUNDLE_FILES
+    artifact = Path(report["artifact"])
+    assert {entry.name for entry in artifact.iterdir()} == REQUIRED_BUNDLE_FILES
+    config = json.loads((artifact / "config.json").read_text(encoding="utf-8"))
+    assert config["statistics"]["confidence_interval"] == "not reported"
 
 
 def test_cli_rejects_unknown_benchmark_profile() -> None:

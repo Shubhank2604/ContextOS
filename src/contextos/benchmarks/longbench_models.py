@@ -6,6 +6,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from contextos.benchmarks.models import ConfidenceInterval
+
 
 class LongBenchProfile(StrEnum):
     """Deterministic external-benchmark execution profiles."""
@@ -181,6 +183,22 @@ class LongBenchDatasetAggregate(BaseModel):
     successful_case_count: int = Field(ge=0)
     mean_score: float | None = Field(default=None, ge=0.0, le=1.0)
     mean_quality_retention: float | None = Field(default=None, ge=0.0)
+    score_ci95: ConfidenceInterval | None = None
+    quality_retention_ci95: ConfidenceInterval | None = None
+
+
+class LongBenchPairedComparison(BaseModel):
+    """Paired candidate-minus-reference score delta within one dataset."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dataset: str
+    candidate_strategy: str
+    reference_strategy: str = "full_context"
+    metric: LongBenchMetric
+    case_count: int = Field(ge=0)
+    mean_score_delta: float
+    score_delta_ci95: ConfidenceInterval | None = None
 
 
 class LongBenchScoreReport(BaseModel):
@@ -188,10 +206,11 @@ class LongBenchScoreReport(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     prepared_sha256: str
     prediction_count: int = Field(gt=0)
     provider: str
     model: str
     case_scores: list[LongBenchCaseScore]
     dataset_aggregates: list[LongBenchDatasetAggregate]
+    paired_comparisons: list[LongBenchPairedComparison] = Field(default_factory=list)

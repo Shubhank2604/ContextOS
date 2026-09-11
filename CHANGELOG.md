@@ -8,6 +8,9 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4G paired statistical reporting with seeded 1,000-resample bootstrap 95% confidence intervals for sufficiently large ContextOS-Bench and per-dataset LongBench samples.
+- Direct ContextOS-versus-baseline deltas, explicit paired sample counts, deterministic seeds, and artifact metadata documenting interval thresholds and the real-model repetition policy.
+- Explicit no-interval rationale for undersized positional cells and the 10-case deduplication development fixture, plus same-provider/model/decoding guidance for empirical claims.
 - Phase 4F immutable seven-file benchmark bundles containing configuration, environment provenance, raw cases, raw predictions, JSON/CSV metrics, and a derived Markdown report.
 - Shared Git SHA, Python/OS, dependency-version, embedding-model, and optional LLM provider/model capture across ContextOS-Bench, ablations, deduplication, positional retrieval, and LongBench.
 - Phase 4E six-variant ContextOS ablation runner covering semantic deduplication, recency, dependency scoring, compression, and position-aware layout, with per-case raw measurements, bootstrap intervals, explicit policy overrides, and deltas against full ContextOS.

@@ -39,6 +39,11 @@ def test_ablation_study_runs_every_variant_on_every_case() -> None:
     assert all(aggregate.cir_ci95 is not None for aggregate in run.aggregates)
     assert all(aggregate.mean_input_tokens >= 0 for aggregate in run.aggregates)
     assert all(aggregate.p95_optimizer_latency_ms >= 0 for aggregate in run.aggregates)
+    assert len(run.paired_comparisons) == 15
+    assert all(
+        comparison.reference_strategy == "contextos_full" for comparison in run.paired_comparisons
+    )
+    assert all(comparison.delta_ci95 is not None for comparison in run.paired_comparisons)
     assert run.metadata["strategy_configurations"] == {
         strategy.name: strategy.policy_overrides for strategy in default_ablation_strategies()
     }

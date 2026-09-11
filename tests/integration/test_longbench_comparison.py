@@ -111,6 +111,22 @@ def test_six_strategies_share_provider_model_cases_and_evaluator() -> None:
     assert all(prediction.prompt_input_tokens is not None for prediction in predictions)
     assert len(report.case_scores) == 6
     assert len(report.dataset_aggregates) == 6
+    assert len(report.paired_comparisons) == 9
+    assert {
+        (comparison.reference_strategy, comparison.candidate_strategy)
+        for comparison in report.paired_comparisons
+    } == {
+        ("full_context", "contextos"),
+        ("full_context", "last_n"),
+        ("full_context", "naive_extractive"),
+        ("full_context", "relevance_only"),
+        ("full_context", "sliding_window"),
+        ("last_n", "contextos"),
+        ("naive_extractive", "contextos"),
+        ("relevance_only", "contextos"),
+        ("sliding_window", "contextos"),
+    }
+    assert all(comparison.score_delta_ci95 is None for comparison in report.paired_comparisons)
     assert all(score.score == 1.0 for score in report.case_scores)
     assert all(score.quality_retention == 1.0 for score in report.case_scores)
 
@@ -146,6 +162,8 @@ def test_longbench_comparison_writes_complete_execution_bundle(tmp_path: Path) -
     config = json.loads((path / "config.json").read_text(encoding="utf-8"))
     environment = json.loads((path / "environment.json").read_text(encoding="utf-8"))
     assert config["execution"]["context_budget_tokens"] == 8
+    assert config["execution"]["temperature"] == 0.0
+    assert config["statistics"]["minimum_sample_size"] == 20
     assert config["source_revision"] == "fixture-revision"
     assert environment["llm_provider"] == "fixture"
     assert environment["llm_model"] == "fixture-v1"

@@ -13,8 +13,12 @@ from contextos.benchmarks.models import (
     BenchmarkMeasurement,
     ConfidenceInterval,
     ContextOSBenchCase,
+    PairedMetricComparison,
 )
 from contextos.trace import OptimizedContext
+
+DEFAULT_BOOTSTRAP_RESAMPLES = 1_000
+MIN_BOOTSTRAP_SAMPLE_SIZE = 20
 
 
 def retained_fact_labels(
@@ -151,7 +155,7 @@ def bootstrap_mean_ci(
     values: Sequence[float],
     *,
     seed: int,
-    resamples: int = 1_000,
+    resamples: int = DEFAULT_BOOTSTRAP_RESAMPLES,
     confidence_level: float = 0.95,
 ) -> ConfidenceInterval:
     """Calculate a reproducible percentile-bootstrap interval for a mean."""
@@ -207,7 +211,7 @@ def aggregate_measurements(
         strategy_seed = bootstrap_seed + int.from_bytes(
             hashlib.sha256(strategy.encode("utf-8")).digest()[:4], "big"
         )
-        enough_for_ci = len(successful) >= 20
+        enough_for_ci = len(successful) >= MIN_BOOTSTRAP_SAMPLE_SIZE
         aggregates.append(
             BenchmarkAggregate(
                 strategy=strategy,
@@ -236,3 +240,62 @@ def aggregate_measurements(
             )
         )
     return aggregates
+
+
+def paired_metric_comparisons(
+    measurements: Sequence[BenchmarkMeasurement],
+    *,
+    reference_strategy: str,
+    bootstrap_seed: int,
+    candidate_strategies: Sequence[str] | None = None,
+) -> list[PairedMetricComparison]:
+    """Bootstrap within-case deltas so strategy comparisons preserve pairing."""
+    metrics = (
+        "task_specific_score",
+        "critical_information_recall",
+        "input_tokens",
+    )
+    reference = {
+        measurement.case_id: measurement
+        for measurement in measurements
+        if measurement.strategy == reference_strategy and measurement.status == "ok"
+    }
+    available = {measurement.strategy for measurement in measurements} - {reference_strategy}
+    candidates = sorted(
+        available if candidate_strategies is None else available & set(candidate_strategies)
+    )
+    comparisons: list[PairedMetricComparison] = []
+    for candidate in candidates:
+        candidate_by_case = {
+            measurement.case_id: measurement
+            for measurement in measurements
+            if measurement.strategy == candidate and measurement.status == "ok"
+        }
+        shared_ids = sorted(set(reference) & set(candidate_by_case))
+        if not shared_ids:
+            continue
+        for metric_index, metric in enumerate(metrics):
+            deltas = [
+                float(getattr(candidate_by_case[case_id], metric))
+                - float(getattr(reference[case_id], metric))
+                for case_id in shared_ids
+            ]
+            seed_material = f"{reference_strategy}|{candidate}|{metric}".encode()
+            comparison_seed = bootstrap_seed + int.from_bytes(
+                hashlib.sha256(seed_material).digest()[:4], "big"
+            )
+            comparisons.append(
+                PairedMetricComparison(
+                    reference_strategy=reference_strategy,
+                    candidate_strategy=candidate,
+                    metric=metric,
+                    case_count=len(deltas),
+                    mean_delta=mean(deltas) if deltas else 0.0,
+                    delta_ci95=(
+                        bootstrap_mean_ci(deltas, seed=comparison_seed + metric_index)
+                        if len(deltas) >= MIN_BOOTSTRAP_SAMPLE_SIZE
+                        else None
+                    ),
+                )
+            )
+    return comparisons
