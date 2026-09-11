@@ -61,3 +61,21 @@ The current offline ContextOS-Bench comparison is diagnostic, not a finalized em
 The current deterministic run is diagnostic. Full ContextOS scores `0.68` on annotated-fact recall and `0.52` CIR at a mean `69.84` input tokens. Removing dependency scoring lowers task score to `0.60` while CIR remains `0.52` and mean input falls to `68.56` tokens. The other removals are neutral on task score, CIR, and input tokens in this dataset. Single-run millisecond latency differences are retained raw but are too small and noisy to support a component-value claim.
 
 These neutral results define benchmark sensitivity rather than proving that the components have no value. The presence-based evaluator cannot measure layout effects, and these cases do not materially exercise compression, semantic duplicate removal, or recency-sensitive selection. Accordingly, no component is removed on this evidence alone. Position-aware layout must be judged by the positional provider experiment; the other components require targeted or external cases before a simplification decision.
+
+## Phase 4F immutable artifacts
+
+Every meaningful ContextOS-Bench, ablation, deduplication, positional, and LongBench run writes one timestamped strategy/profile directory containing exactly:
+
+```text
+config.json
+environment.json
+cases.jsonl
+predictions.jsonl
+metrics.json
+metrics.csv
+report.md
+```
+
+`environment.json` records the Python and ContextOS versions, Git SHA, operating system, relevant installed dependency versions, embedding provider/model, and LLM provider/model when applicable. `config.json` records track-specific dataset identity, strategies, budgets, thresholds, source revisions, and decoding settings. Existing bundle paths are accepted only when all seven files match byte-for-byte; missing, added, or changed files are rejected as mutation or collision.
+
+Raw cases, predictions, and JSON metrics are the source of truth. CSV and Markdown are deterministic derived views for analysis and review. `contextos benchmark --profile quick` is intentionally excluded because it is an ephemeral CI smoke test rather than a meaningful research run. Generated bundles remain ignored until an explicit evidence review approves them for version control.

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from contextos.benchmarks.bundles import REQUIRED_BUNDLE_FILES
 from contextos.benchmarks.positional import (
     REQUIRED_CONTEXT_LENGTHS,
     aggregate_positional_predictions,
@@ -144,9 +145,10 @@ def test_positional_artifacts_are_immutable(tmp_path: Path) -> None:
         max_context_tokens=288,
         strategies=[PositionalStrategy.ORIGINAL_FULL],
     )
-    path = write_positional_run_artifact(run, tmp_path)
+    path = write_positional_run_artifact(run, tmp_path, dataset=dataset)
 
-    assert path == write_positional_run_artifact(run, tmp_path)
+    assert path == write_positional_run_artifact(run, tmp_path, dataset=dataset)
+    assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
     conflicting = run.model_copy(update={"provider": "different"})
     with pytest.raises(ValueError, match="collision"):
-        write_positional_run_artifact(conflicting, tmp_path)
+        write_positional_run_artifact(conflicting, tmp_path, dataset=dataset)

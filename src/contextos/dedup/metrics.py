@@ -39,14 +39,24 @@ class DeduplicationMetrics(BaseModel):
     f1: float = Field(ge=0.0, le=1.0)
 
 
-def evaluate_deduplication_cases(
+class DeduplicationPrediction(BaseModel):
+    """Raw labeled outcome retained for one deduplication fixture pair."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    case_id: str
+    expected_duplicate: bool
+    predicted_duplicate: bool
+
+
+def deduplication_predictions(
     cases: list[DeduplicationCase],
     *,
     provider: EmbeddingProvider,
     threshold: float = 0.92,
-) -> DeduplicationMetrics:
-    """Evaluate exact-plus-semantic deduplication on labeled pairs."""
-    true_positive = true_negative = false_positive = false_negative = 0
+) -> list[DeduplicationPrediction]:
+    """Return auditable per-case exact-plus-semantic duplicate decisions."""
+    predictions: list[DeduplicationPrediction] = []
     timestamp = datetime(2026, 1, 1, tzinfo=UTC)
     for case in cases:
         items = [
@@ -69,12 +79,31 @@ def evaluate_deduplication_cases(
         ]
         exact = exact_deduplicate(items)
         semantic = semantic_deduplicate(exact.items, provider=provider, threshold=threshold)
-        predicted_duplicate = len(semantic.items) < 2 or len(exact.items) < 2
-        if predicted_duplicate and case.should_deduplicate:
+        predictions.append(
+            DeduplicationPrediction(
+                case_id=case.id,
+                expected_duplicate=case.should_deduplicate,
+                predicted_duplicate=len(semantic.items) < 2 or len(exact.items) < 2,
+            )
+        )
+    return predictions
+
+
+def evaluate_deduplication_cases(
+    cases: list[DeduplicationCase],
+    *,
+    provider: EmbeddingProvider,
+    threshold: float = 0.92,
+) -> DeduplicationMetrics:
+    """Evaluate exact-plus-semantic deduplication on labeled pairs."""
+    true_positive = true_negative = false_positive = false_negative = 0
+    predictions = deduplication_predictions(cases, provider=provider, threshold=threshold)
+    for prediction in predictions:
+        if prediction.predicted_duplicate and prediction.expected_duplicate:
             true_positive += 1
-        elif predicted_duplicate:
+        elif prediction.predicted_duplicate:
             false_positive += 1
-        elif case.should_deduplicate:
+        elif prediction.expected_duplicate:
             false_negative += 1
         else:
             true_negative += 1

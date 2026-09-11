@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from contextos.benchmarks.bundles import REQUIRED_BUNDLE_FILES
 from contextos.benchmarks.longbench_models import (
     LongBenchCase,
     LongBenchMetric,
@@ -14,10 +15,9 @@ from contextos.benchmarks.longbench_models import (
     LongBenchProfile,
     PreparedLongBenchSubset,
 )
-from contextos.benchmarks.models import BenchmarkRun
-from contextos.benchmarks.positional_models import PositionalRun
 from contextos.cli import app
 from contextos.models import ContextItem, ContextType
+from contextos.providers.base import ProviderResponse
 
 runner = CliRunner()
 
@@ -138,7 +138,7 @@ def test_cli_inspect_runs_without_optimization(tmp_path: Path) -> None:
     assert report["items_by_type"] == {"user_message": 1}
 
 
-def test_cli_deduplication_benchmark_runs_end_to_end() -> None:
+def test_cli_deduplication_benchmark_runs_end_to_end(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
@@ -146,6 +146,8 @@ def test_cli_deduplication_benchmark_runs_end_to_end() -> None:
             "dedup",
             "--input",
             "benchmarks/datasets/deduplication_cases.json",
+            "--output-directory",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0
@@ -153,6 +155,7 @@ def test_cli_deduplication_benchmark_runs_end_to_end() -> None:
     assert report["case_count"] == 10
     assert report["false_positive"] == 0
     assert report["f1"] == 1.0
+    assert {entry.name for entry in Path(report["artifact"]).iterdir()} == REQUIRED_BUNDLE_FILES
 
 
 def test_cli_rejects_unknown_benchmark_profile() -> None:
@@ -179,10 +182,11 @@ def test_cli_contextos_bench_writes_immutable_artifact(tmp_path: Path) -> None:
     assert result.exit_code == 0
     report = json.loads(result.stdout)
     artifact = Path(report["artifact"])
-    assert artifact.exists()
-    run = BenchmarkRun.model_validate_json(artifact.read_text(encoding="utf-8"))
-    assert run.metadata["case_count"] == 1
-    assert len(run.measurements) == 6
+    assert {entry.name for entry in artifact.iterdir()} == REQUIRED_BUNDLE_FILES
+    config = json.loads((artifact / "config.json").read_text(encoding="utf-8"))
+    predictions = (artifact / "predictions.jsonl").read_text(encoding="utf-8").splitlines()
+    assert config["metadata"]["case_count"] == 1
+    assert len(predictions) == 6
 
 
 def test_cli_ablation_writes_all_six_variants(tmp_path: Path) -> None:
@@ -200,8 +204,9 @@ def test_cli_ablation_writes_all_six_variants(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     report = json.loads(result.stdout)
-    run = BenchmarkRun.model_validate_json(Path(report["artifact"]).read_text(encoding="utf-8"))
-    assert run.strategies == [
+    artifact = Path(report["artifact"])
+    config = json.loads((artifact / "config.json").read_text(encoding="utf-8"))
+    assert config["strategies"] == [
         "contextos_full",
         "contextos_without_semantic_deduplication",
         "contextos_without_recency",
@@ -209,8 +214,8 @@ def test_cli_ablation_writes_all_six_variants(tmp_path: Path) -> None:
         "contextos_without_compression",
         "contextos_without_position_aware_layout",
     ]
-    assert len(run.measurements) == 6
-    assert set(report["effects_vs_contextos_full"]) == set(run.strategies[1:])
+    assert len((artifact / "predictions.jsonl").read_text(encoding="utf-8").splitlines()) == 6
+    assert set(report["effects_vs_contextos_full"]) == set(config["strategies"][1:])
 
 
 def test_cli_benchmark_compare_reports_zero_delta_for_same_run(tmp_path: Path) -> None:
@@ -257,10 +262,10 @@ def test_cli_positional_quick_run_writes_raw_artifact(tmp_path: Path) -> None:
     assert result.exit_code == 0
     report = json.loads(result.stdout)
     artifact = Path(report["artifact"])
-    run = PositionalRun.model_validate_json(artifact.read_text(encoding="utf-8"))
+    metrics = json.loads((artifact / "metrics.json").read_text(encoding="utf-8"))
     assert report["prediction_count"] == 15
-    assert run.executed_context_lengths == [4_096]
-    assert len(run.robustness) == 3
+    assert len(metrics["robustness"]) == 3
+    assert {entry.name for entry in artifact.iterdir()} == REQUIRED_BUNDLE_FILES
 
 
 def test_cli_positional_openai_requires_explicit_model(tmp_path: Path) -> None:
@@ -303,7 +308,7 @@ def test_cli_longbench_scores_complete_id_keyed_predictions(tmp_path: Path) -> N
     )
     prepared_path = tmp_path / "prepared.json"
     predictions_path = tmp_path / "predictions.jsonl"
-    output_path = tmp_path / "scores.json"
+    output_path = tmp_path / "results"
     prepared_path.write_text(subset.model_dump_json(indent=2), encoding="utf-8")
     prediction = LongBenchPrediction(
         dataset=case.dataset,
@@ -333,6 +338,8 @@ def test_cli_longbench_scores_complete_id_keyed_predictions(tmp_path: Path) -> N
     report = json.loads(result.stdout)
     assert report["prediction_count"] == 1
     assert report["dataset_aggregates"][0]["mean_score"] == 1.0
+    artifact = Path(report["artifact"])
+    assert {entry.name for entry in artifact.iterdir()} == REQUIRED_BUNDLE_FILES
 
 
 def test_cli_longbench_prepare_uses_explicit_external_adapter(
@@ -443,3 +450,73 @@ def test_cli_longbench_run_requires_working_explicit_provider(
     assert result.exit_code == 2
     assert "all LongBench comparisons failed" in result.stderr
     assert not output_path.exists()
+
+
+def test_cli_longbench_run_scores_and_bundles_provider_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = LongBenchCase(
+        dataset="hotpotqa",
+        source_id="source-1",
+        input="What is the answer?",
+        context="The answer is ContextOS.",
+        answers=["ContextOS"],
+        source_length=4,
+        language="en",
+        metric=LongBenchMetric.QA_F1,
+        prompt_template="Context: {context}\nQuestion: {input}\nAnswer:",
+        max_output_tokens=8,
+    )
+    subset = PreparedLongBenchSubset(
+        profile=LongBenchProfile.QUICK,
+        source_repository="fixture",
+        source_revision="fixture-revision",
+        source_split="test",
+        sampling_seed=1,
+        cases=[case],
+    )
+    prepared_path = tmp_path / "prepared.json"
+    prepared_path.write_text(subset.model_dump_json(indent=2), encoding="utf-8")
+
+    class FixtureProvider:
+        def __init__(self, *, model: str, temperature: float) -> None:
+            assert model == "fixture-v1"
+            assert temperature == 0.0
+
+        def complete(self, prompt: str, *, max_output_tokens: int) -> ProviderResponse:
+            return ProviderResponse(
+                text="ContextOS",
+                input_tokens=len(prompt.split()),
+                output_tokens=min(1, max_output_tokens),
+                model="fixture-v1",
+            )
+
+    monkeypatch.setattr("contextos.cli.OpenAIProvider", FixtureProvider)
+    output_path = tmp_path / "results"
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "longbench",
+            "run",
+            "--prepared",
+            str(prepared_path),
+            "--output",
+            str(output_path),
+            "--model",
+            "fixture-v1",
+            "--context-budget-tokens",
+            "16",
+            "--max-context-tokens",
+            "128",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    artifact = Path(report["artifact"])
+    assert {entry.name for entry in artifact.iterdir()} == REQUIRED_BUNDLE_FILES
+    config = json.loads((artifact / "config.json").read_text(encoding="utf-8"))
+    assert config["execution"]["context_budget_tokens"] == 16
+    assert len((artifact / "predictions.jsonl").read_text(encoding="utf-8").splitlines()) == 6

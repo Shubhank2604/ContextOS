@@ -1,5 +1,13 @@
 """ContextOS-Bench public schemas."""
 
+from contextos.benchmarks.bundles import (
+    REQUIRED_BUNDLE_FILES,
+    BenchmarkEnvironment,
+    LoadedBenchmarkBundle,
+    capture_environment,
+    load_benchmark_bundle,
+    write_benchmark_bundle,
+)
 from contextos.benchmarks.models import (
     BenchmarkAggregate,
     BenchmarkAnswerKey,
@@ -21,8 +29,10 @@ from contextos.benchmarks.runner import (
 )
 
 __all__ = [
+    "REQUIRED_BUNDLE_FILES",
     "BenchmarkAggregate",
     "BenchmarkAnswerKey",
+    "BenchmarkEnvironment",
     "BenchmarkFamily",
     "BenchmarkMeasurement",
     "BenchmarkRun",
@@ -31,9 +41,13 @@ __all__ = [
     "ConfidenceInterval",
     "ContextOSBenchCase",
     "ContextOSBenchDataset",
+    "LoadedBenchmarkBundle",
     "RequiredFact",
     "TaskMetric",
     "ablation_effects",
+    "capture_environment",
     "default_ablation_strategies",
+    "load_benchmark_bundle",
     "run_contextos_bench",
+    "write_benchmark_bundle",
 ]

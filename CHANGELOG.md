@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4F immutable seven-file benchmark bundles containing configuration, environment provenance, raw cases, raw predictions, JSON/CSV metrics, and a derived Markdown report.
+- Shared Git SHA, Python/OS, dependency-version, embedding-model, and optional LLM provider/model capture across ContextOS-Bench, ablations, deduplication, positional retrieval, and LongBench.
 - Phase 4E six-variant ContextOS ablation runner covering semantic deduplication, recency, dependency scoring, compression, and position-aware layout, with per-case raw measurements, bootstrap intervals, explicit policy overrides, and deltas against full ContextOS.
 - `contextos benchmark ablation` and an explicit semantic-deduplication runtime switch for controlled single-component experiments.
 - Phase 4D Relevance Only and Naive Extractive baselines with deterministic budget selection, full optimization traces, public SDK/CLI access, and the shared six-strategy benchmark protocol.

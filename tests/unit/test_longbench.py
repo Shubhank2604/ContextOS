@@ -16,7 +16,6 @@ from contextos.benchmarks.longbench import (
     retrieval_score,
     score_longbench_predictions,
     write_prepared_subset,
-    write_score_report,
 )
 from contextos.benchmarks.longbench_models import (
     LongBenchPrediction,
@@ -158,7 +157,7 @@ def test_scoring_joins_preserved_ids_and_keeps_metrics_separate() -> None:
         score_longbench_predictions(subset, mixed)
 
 
-def test_prepared_and_score_outputs_refuse_conflicting_overwrites(tmp_path: Path) -> None:
+def test_prepared_output_refuses_conflicting_overwrites(tmp_path: Path) -> None:
     subset = prepare_longbench_subset(
         _config(),
         profile=LongBenchProfile.QUICK,
@@ -170,18 +169,3 @@ def test_prepared_and_score_outputs_refuse_conflicting_overwrites(tmp_path: Path
     prepared_path.write_text(json.dumps({"different": True}), encoding="utf-8")
     with pytest.raises(ValueError, match="different content"):
         write_prepared_subset(subset, prepared_path)
-
-    predictions = [
-        LongBenchPrediction(
-            dataset=case.dataset,
-            source_id=case.source_id,
-            prediction=case.answers[0],
-            provider="fixture",
-            model="fixture-v1",
-        )
-        for case in subset.cases
-    ]
-    report = score_longbench_predictions(subset, predictions)
-    score_path = tmp_path / "scores.json"
-    assert write_score_report(report, score_path) == score_path
-    assert write_score_report(report, score_path) == score_path

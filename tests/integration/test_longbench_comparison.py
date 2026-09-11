@@ -1,6 +1,14 @@
 """Offline six-strategy LongBench comparison integration tests."""
 
-from contextos.benchmarks.longbench import score_longbench_predictions
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+from contextos.benchmarks.bundles import REQUIRED_BUNDLE_FILES
+from contextos.benchmarks.longbench import (
+    score_longbench_predictions,
+    write_longbench_bundle,
+)
 from contextos.benchmarks.longbench_models import (
     LongBenchCase,
     LongBenchMetric,
@@ -105,6 +113,43 @@ def test_six_strategies_share_provider_model_cases_and_evaluator() -> None:
     assert len(report.dataset_aggregates) == 6
     assert all(score.score == 1.0 for score in report.case_scores)
     assert all(score.quality_retention == 1.0 for score in report.case_scores)
+
+
+def test_longbench_comparison_writes_complete_execution_bundle(tmp_path: Path) -> None:
+    subset = _subset()
+    predictions = run_longbench_comparison(
+        subset,
+        provider=FixedAnswerProvider("thirty seconds"),
+        provider_name="fixture",
+        provider_model="fixture-v1",
+        tokenizer=WordTokenizer(),
+        context_budget_tokens=8,
+        max_context_tokens=100,
+        max_chunk_tokens=4,
+    )
+    score_report = score_longbench_predictions(subset, predictions)
+    path = write_longbench_bundle(
+        subset,
+        predictions,
+        score_report,
+        tmp_path,
+        execution_config={
+            "temperature": 0.0,
+            "context_budget_tokens": 8,
+            "max_context_tokens": 100,
+            "max_chunk_tokens": 4,
+        },
+        recorded_at_utc=datetime(2026, 9, 11, tzinfo=UTC),
+    )
+
+    assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
+    config = json.loads((path / "config.json").read_text(encoding="utf-8"))
+    environment = json.loads((path / "environment.json").read_text(encoding="utf-8"))
+    assert config["execution"]["context_budget_tokens"] == 8
+    assert config["source_revision"] == "fixture-revision"
+    assert environment["llm_provider"] == "fixture"
+    assert environment["llm_model"] == "fixture-v1"
+    assert len((path / "predictions.jsonl").read_text(encoding="utf-8").splitlines()) == 6
 
 
 def test_full_context_infeasibility_is_raw_and_not_scored() -> None:

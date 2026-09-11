@@ -19,8 +19,9 @@ from contextos.baselines import (
     RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
-from contextos.benchmarking import run_deduplication_benchmark, run_quick_benchmark
+from contextos.benchmarking import run_quick_benchmark, write_deduplication_benchmark_bundle
 from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
+from contextos.benchmarks.bundles import load_benchmark_bundle
 from contextos.benchmarks.longbench import (
     HuggingFaceLongBenchSource,
     load_longbench_config,
@@ -28,15 +29,12 @@ from contextos.benchmarks.longbench import (
     load_prepared_subset,
     prepare_longbench_subset,
     score_longbench_predictions,
+    write_longbench_bundle,
     write_prepared_subset,
-    write_score_report,
 )
 from contextos.benchmarks.longbench_models import LongBenchProfile
-from contextos.benchmarks.longbench_runner import (
-    run_longbench_comparison,
-    write_longbench_predictions,
-)
-from contextos.benchmarks.models import BenchmarkRun
+from contextos.benchmarks.longbench_runner import run_longbench_comparison
+from contextos.benchmarks.models import BenchmarkAggregate, BenchmarkRun
 from contextos.benchmarks.positional import (
     load_positional_dataset,
     positional_summary,
@@ -201,14 +199,27 @@ def benchmark_deduplication(
         typer.Option("--input", exists=True, file_okay=True, dir_okay=False, readable=True),
     ] = Path("benchmarks/datasets/deduplication_cases.json"),
     threshold: Annotated[float, typer.Option("--threshold", min=0.0, max=1.0)] = 0.92,
+    output_directory: Annotated[Path, typer.Option("--output-directory")] = Path(
+        "benchmarks/results"
+    ),
 ) -> None:
     """Measure deduplication precision, recall, F1, and false positives."""
     try:
-        metrics = run_deduplication_benchmark(input_path, threshold=threshold)
+        artifact, metrics = write_deduplication_benchmark_bundle(
+            input_path,
+            output_directory,
+            threshold=threshold,
+        )
     except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
         typer.echo(f"Deduplication benchmark failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
-    typer.echo(metrics.model_dump_json(indent=2))
+    typer.echo(
+        json.dumps(
+            {**metrics.model_dump(mode="json"), "artifact": str(artifact)},
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 @benchmark_app.command("run")
@@ -230,7 +241,13 @@ def benchmark_run_command(
             tokenizer=TiktokenTokenizer(),
             case_limit=case_limit,
         )
-        artifact_path = write_run_artifact(run, output_directory)
+        artifact_path = write_run_artifact(
+            run,
+            output_directory,
+            dataset=dataset,
+            profile="full" if case_limit is None else f"limited-{case_limit}",
+            strategy_label="comparison",
+        )
     except (ContextOSError, OSError, ValueError, ValidationError) as exc:
         typer.echo(f"ContextOS-Bench failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -268,7 +285,13 @@ def benchmark_ablation_command(
             strategies=default_ablation_strategies(),
             case_limit=case_limit,
         )
-        artifact_path = write_run_artifact(run, output_directory)
+        artifact_path = write_run_artifact(
+            run,
+            output_directory,
+            dataset=dataset,
+            profile="full" if case_limit is None else f"limited-{case_limit}",
+            strategy_label="ablation",
+        )
     except (ContextOSError, OSError, ValueError, ValidationError) as exc:
         typer.echo(f"ContextOS ablation failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -344,7 +367,7 @@ def benchmark_positional_command(
             profile=profile,
             max_context_tokens=max_context_tokens,
         )
-        artifact = write_positional_run_artifact(run, output_directory)
+        artifact = write_positional_run_artifact(run, output_directory, dataset=dataset)
     except (ContextOSError, OSError, ValueError, ValidationError) as exc:
         typer.echo(f"Positional benchmark failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -419,7 +442,13 @@ def benchmark_longbench_score_command(
         subset = load_prepared_subset(prepared_path)
         predictions = load_longbench_predictions(predictions_path)
         report = score_longbench_predictions(subset, predictions)
-        artifact = write_score_report(report, output_path)
+        artifact = write_longbench_bundle(
+            subset,
+            predictions,
+            report,
+            output_path,
+            execution_config={"origin": "imported_predictions"},
+        )
     except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
         typer.echo(f"LongBench scoring failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -482,7 +511,20 @@ def benchmark_longbench_run_command(
                 "no strategy completed",
             )
             raise ValueError(f"all LongBench comparisons failed: {first_warning}")
-        artifact = write_longbench_predictions(predictions, output_path)
+        score_report = score_longbench_predictions(subset, predictions)
+        artifact = write_longbench_bundle(
+            subset,
+            predictions,
+            score_report,
+            output_path,
+            execution_config={
+                "origin": "contextos_benchmark_longbench_run",
+                "temperature": 0.0,
+                "context_budget_tokens": context_budget_tokens,
+                "max_context_tokens": max_context_tokens,
+                "max_chunk_tokens": max_chunk_tokens,
+            },
+        )
     except (ContextOSError, OSError, ValueError, ValidationError) as exc:
         typer.echo(f"LongBench comparison failed: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -533,19 +575,34 @@ def inspect(
     typer.echo(json.dumps(report, indent=2, sort_keys=True))
 
 
+def _load_benchmark_aggregates(
+    path: Path,
+) -> tuple[str, dict[str, BenchmarkAggregate]]:
+    """Load aggregates from a Phase 4F bundle or a legacy single-file run."""
+    if path.is_dir():
+        bundle = load_benchmark_bundle(path)
+        dataset_sha = str(bundle.config["dataset_sha256"])
+        aggregates = [
+            BenchmarkAggregate.model_validate(value) for value in bundle.metrics["aggregates"]
+        ]
+    else:
+        run = BenchmarkRun.model_validate_json(path.read_text(encoding="utf-8"))
+        dataset_sha = run.dataset_sha256
+        aggregates = run.aggregates
+    return dataset_sha, {aggregate.strategy: aggregate for aggregate in aggregates}
+
+
 @benchmark_app.command("compare")
 def benchmark_compare(
-    left: Annotated[Path, typer.Option("--left", exists=True, dir_okay=False)],
-    right: Annotated[Path, typer.Option("--right", exists=True, dir_okay=False)],
+    left: Annotated[Path, typer.Option("--left", exists=True)],
+    right: Annotated[Path, typer.Option("--right", exists=True)],
 ) -> None:
     """Compare aggregate metrics from two runs of the same dataset."""
     try:
-        left_run = BenchmarkRun.model_validate_json(left.read_text(encoding="utf-8"))
-        right_run = BenchmarkRun.model_validate_json(right.read_text(encoding="utf-8"))
-        if left_run.dataset_sha256 != right_run.dataset_sha256:
+        left_sha, left_aggregates = _load_benchmark_aggregates(left)
+        right_sha, right_aggregates = _load_benchmark_aggregates(right)
+        if left_sha != right_sha:
             raise ValueError("benchmark runs use different datasets")
-        left_aggregates = {aggregate.strategy: aggregate for aggregate in left_run.aggregates}
-        right_aggregates = {aggregate.strategy: aggregate for aggregate in right_run.aggregates}
         shared_strategies = sorted(set(left_aggregates) & set(right_aggregates))
         comparison = {
             strategy: {

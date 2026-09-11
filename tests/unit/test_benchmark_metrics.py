@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
+from contextos.benchmarks.bundles import REQUIRED_BUNDLE_FILES
 from contextos.benchmarks.metrics import bootstrap_mean_ci, percentile
 from contextos.benchmarks.runner import run_contextos_bench
 from contextos.tokenization import TiktokenTokenizer
@@ -62,10 +63,29 @@ def test_run_artifacts_are_content_addressed_and_immutable(tmp_path: Path) -> No
         tokenizer=TiktokenTokenizer(),
         case_limit=1,
     )
-    path = write_run_artifact(run, tmp_path)
+    path = write_run_artifact(
+        run,
+        tmp_path,
+        dataset=dataset,
+        profile="limited-1",
+        strategy_label="comparison",
+    )
 
-    assert path == write_run_artifact(run, tmp_path)
-    assert path.name == f"contextos-bench-{run.run_id}.json"
-    conflicting = run.model_copy(update={"metadata": {"different": True}})
+    assert path == write_run_artifact(
+        run,
+        tmp_path,
+        dataset=dataset,
+        profile="limited-1",
+        strategy_label="comparison",
+    )
+    assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
+    assert path.name.endswith("-comparison-limited-1")
+    conflicting = run.model_copy(update={"metadata": {**run.metadata, "different": True}})
     with pytest.raises(ValueError, match="collision"):
-        write_run_artifact(conflicting, tmp_path)
+        write_run_artifact(
+            conflicting,
+            tmp_path,
+            dataset=dataset,
+            profile="limited-1",
+            strategy_label="comparison",
+        )

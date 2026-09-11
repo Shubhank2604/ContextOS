@@ -114,7 +114,7 @@ Score one complete prediction file with:
 contextos benchmark longbench score \
   --prepared out/longbench/prepared-standard.json \
   --predictions out/longbench/predictions.jsonl \
-  --output out/longbench/scores.json
+  --output benchmarks/results
 ```
 
 Scoring rejects duplicate, missing, or unknown source IDs and mixed provider/model configurations. Aggregates remain separate by dataset and metric; unlike metrics are never collapsed into an unexplained overall average.
@@ -126,12 +126,16 @@ Run all required strategies against one explicitly selected OpenAI configuration
 ```bash
 contextos benchmark longbench run \
   --prepared out/longbench/prepared-standard.json \
-  --output out/longbench/predictions-standard.jsonl \
+  --output benchmarks/results \
   --model MODEL_ID \
   --context-budget-tokens 8192 \
   --max-context-tokens MODEL_CONTEXT_LIMIT
 ```
 
-The runner splits each external context into exact contiguous source-preserving chunks, uses the same case prompt, output bound, provider, model, temperature, evaluator, and constrained context budget for every applicable strategy, and records Full Context as infeasible rather than silently truncating it. The command requires `OPENAI_API_KEY`; it is never run by normal CI. Score the resulting JSONL with the separate `longbench score` command above.
+The runner splits each external context into exact contiguous source-preserving chunks, uses the same case prompt, output bound, provider, model, temperature, evaluator, and constrained context budget for every applicable strategy, and records Full Context as infeasible rather than silently truncating it. The command requires `OPENAI_API_KEY`; it is never run by normal CI. Successful provider execution is scored immediately and written as one complete bundle. The separate `longbench score` command bundles externally supplied prediction JSONL.
 
-The same prepare/run/score sequence is available through the manual-only `LongBench comparison` GitHub Actions workflow. It requires explicit inputs and the `OPENAI_API_KEY` repository secret; push and pull-request CI never invokes it.
+The same prepare/run sequence is available through the manual-only `LongBench comparison` GitHub Actions workflow. It requires explicit inputs and the `OPENAI_API_KEY` repository secret; push and pull-request CI never invokes it.
+
+## Artifact bundle contract
+
+Every meaningful benchmark produces `benchmarks/results/<timestamp>-<strategy>-<profile>/` with `config.json`, `environment.json`, `cases.jsonl`, `predictions.jsonl`, `metrics.json`, `metrics.csv`, and `report.md`. Writers refuse an existing directory unless its exact file set and byte content match. Machine-readable raw records are authoritative; reports are derived.

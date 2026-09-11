@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -17,10 +18,12 @@ from contextos.baselines import (
     RelevanceOnlyBaseline,
     SlidingWindowBaseline,
 )
+from contextos.benchmarks.bundles import capture_environment, write_benchmark_bundle
 from contextos.config import OptimizationPolicy
 from contextos.dedup.metrics import (
     DeduplicationCase,
     DeduplicationMetrics,
+    deduplication_predictions,
     evaluate_deduplication_cases,
 )
 from contextos.embeddings import DeterministicEmbeddingProvider
@@ -144,3 +147,50 @@ def run_deduplication_benchmark(
         provider=DeterministicEmbeddingProvider(),
         threshold=threshold,
     )
+
+
+def write_deduplication_benchmark_bundle(
+    fixture_path: Path,
+    output_directory: Path,
+    *,
+    threshold: float = 0.92,
+) -> tuple[Path, DeduplicationMetrics]:
+    """Run the labeled fixture and persist raw decisions plus derived metrics."""
+    raw = fixture_path.read_text(encoding="utf-8")
+    cases = TypeAdapter(list[DeduplicationCase]).validate_json(raw)
+    provider = DeterministicEmbeddingProvider()
+    predictions = deduplication_predictions(cases, provider=provider, threshold=threshold)
+    metrics = evaluate_deduplication_cases(cases, provider=provider, threshold=threshold)
+    recorded_at = datetime.now(UTC)
+    path = write_benchmark_bundle(
+        output_directory=output_directory,
+        recorded_at_utc=recorded_at,
+        strategy="exact-semantic-deduplication",
+        profile="fixture",
+        config={
+            "schema_version": "1.0",
+            "benchmark": "deduplication-quality",
+            "profile": "fixture",
+            "fixture_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+            "semantic_threshold": threshold,
+        },
+        environment=capture_environment(
+            recorded_at_utc=recorded_at,
+            embedding_provider="deterministic",
+            embedding_model=provider.model_name,
+        ),
+        cases=cases,
+        predictions=predictions,
+        metrics=metrics,
+        metric_rows=[metrics.model_dump(mode="json")],
+        report=(
+            "# Deduplication Quality Report\n\n"
+            f"- Cases: {metrics.case_count}\n"
+            f"- Precision: {metrics.precision:.4f}\n"
+            f"- Recall: {metrics.recall:.4f}\n"
+            f"- F1: {metrics.f1:.4f}\n\n"
+            "Raw `cases.jsonl` and `predictions.jsonl` are authoritative; "
+            "this report is derived."
+        ),
+    )
+    return path, metrics

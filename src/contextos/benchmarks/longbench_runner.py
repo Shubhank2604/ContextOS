@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from time import perf_counter
 
 from contextos.baselines import (
@@ -312,21 +311,3 @@ def run_longbench_comparison(
             for strategy in selected_strategies
         )
     return predictions
-
-
-def write_longbench_predictions(
-    predictions: Sequence[LongBenchPrediction],
-    path: Path,
-) -> Path:
-    """Write complete raw strategy outputs as immutable newline-delimited JSON."""
-    if not predictions:
-        raise ValueError("cannot write an empty LongBench prediction set")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = "\n".join(prediction.model_dump_json() for prediction in predictions) + "\n"
-    try:
-        with path.open("x", encoding="utf-8", newline="\n") as output:
-            output.write(content)
-    except FileExistsError:
-        if path.read_text(encoding="utf-8") != content:
-            raise ValueError(f"LongBench prediction output already exists: {path}") from None
-    return path

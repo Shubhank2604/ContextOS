@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import platform
 import sys
 from collections.abc import Sequence
@@ -14,6 +13,7 @@ from statistics import mean, pstdev, pvariance
 from time import perf_counter
 
 from contextos import __version__
+from contextos.benchmarks.bundles import capture_environment, write_benchmark_bundle
 from contextos.benchmarks.positional_models import (
     EvidencePosition,
     PositionAccuracy,
@@ -401,18 +401,82 @@ def run_positional_benchmark(
     )
 
 
-def write_positional_run_artifact(run: PositionalRun, output_directory: Path) -> Path:
-    """Persist a content-addressed positional run without overwriting collisions."""
-    output_directory.mkdir(parents=True, exist_ok=True)
-    path = output_directory / f"positional-{run.run_id}.json"
-    content = run.model_dump_json(indent=2)
-    try:
-        with path.open("x", encoding="utf-8", newline="\n") as output:
-            output.write(content)
-    except FileExistsError:
-        if json.loads(path.read_text(encoding="utf-8")) != json.loads(content):
-            raise ValueError(f"positional artifact ID collision at {path}") from None
-    return path
+def write_positional_run_artifact(
+    run: PositionalRun,
+    output_directory: Path,
+    *,
+    dataset: PositionalDataset,
+) -> Path:
+    """Persist a complete immutable positional benchmark bundle."""
+    case_ids = {prediction.case_id for prediction in run.predictions}
+    cases = [case for case in dataset.cases if case.id in case_ids]
+    if len(cases) != run.metadata["case_count"]:
+        raise ValueError("positional run cases do not match the supplied dataset")
+    environment = capture_environment(
+        recorded_at_utc=run.recorded_at_utc,
+        embedding_provider="not-applicable",
+        embedding_model="not-applicable",
+        llm_provider=run.provider,
+        llm_model=run.model,
+        dependency_names=("openai",) if run.provider == "openai" else (),
+    )
+    config = {
+        "schema_version": "1.0",
+        "benchmark": "positional-retrieval",
+        "run_id": run.run_id,
+        "dataset_sha256": run.dataset_sha256,
+        "profile": run.profile,
+        "provider": run.provider,
+        "model": run.model,
+        "max_context_tokens": run.max_context_tokens,
+        "requested_context_lengths": run.requested_context_lengths,
+        "executed_context_lengths": run.executed_context_lengths,
+        "skipped_context_lengths": run.skipped_context_lengths,
+        "strategies": [strategy.value for strategy in run.strategies],
+        "metadata": run.metadata,
+    }
+    metrics = {
+        "schema_version": "1.0",
+        "run_id": run.run_id,
+        "accuracy_cells": [value.model_dump(mode="json") for value in run.accuracy_cells],
+        "robustness": [value.model_dump(mode="json") for value in run.robustness],
+    }
+    report = [
+        "# Positional Retrieval Report",
+        "",
+        f"- Run ID: `{run.run_id}`",
+        f"- Provider/model: `{run.provider}/{run.model}`",
+        f"- Profile: `{run.profile}`",
+        f"- Predictions: {len(run.predictions)}",
+        "",
+        "| Strategy | Target tokens | Accuracy | Max-min gap |",
+        "|---|---:|---:|---:|",
+    ]
+    report.extend(
+        "| "
+        f"{value.strategy.value} | {value.target_context_tokens} | "
+        f"{value.mean_accuracy:.4f} | {value.max_min_positional_gap:.4f} |"
+        for value in run.robustness
+    )
+    report.extend(
+        [
+            "",
+            "Raw `cases.jsonl` and `predictions.jsonl` are authoritative; this report is derived.",
+        ]
+    )
+    return write_benchmark_bundle(
+        output_directory=output_directory,
+        recorded_at_utc=run.recorded_at_utc,
+        strategy="layout-comparison",
+        profile=run.profile,
+        config=config,
+        environment=environment,
+        cases=cases,
+        predictions=run.predictions,
+        metrics=metrics,
+        metric_rows=[value.model_dump(mode="json") for value in run.robustness],
+        report="\n".join(report),
+    )
 
 
 def positional_summary(run: PositionalRun) -> dict[str, object]:

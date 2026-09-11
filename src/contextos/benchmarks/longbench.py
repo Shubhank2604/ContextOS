@@ -9,6 +9,7 @@ import re
 import string
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from statistics import mean
@@ -16,6 +17,7 @@ from typing import Any, Protocol, cast
 
 from pydantic import ValidationError
 
+from contextos.benchmarks.bundles import capture_environment, write_benchmark_bundle
 from contextos.benchmarks.longbench_models import (
     LongBenchCase,
     LongBenchCaseScore,
@@ -28,6 +30,7 @@ from contextos.benchmarks.longbench_models import (
     LongBenchTaskConfig,
     PreparedLongBenchSubset,
 )
+from contextos.embeddings import DeterministicEmbeddingProvider
 
 
 class LongBenchSource(Protocol):
@@ -377,16 +380,87 @@ def score_longbench_predictions(
     )
 
 
-def write_score_report(report: LongBenchScoreReport, path: Path) -> Path:
-    """Write deterministic LongBench scores without overwriting different results."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = report.model_dump_json(indent=2)
-    try:
-        with path.open("x", encoding="utf-8", newline="\n") as output:
-            output.write(content)
-    except FileExistsError:
-        if json.loads(path.read_text(encoding="utf-8")) != json.loads(content):
-            raise ValueError(
-                f"LongBench score output already exists with different content: {path}"
-            ) from None
-    return path
+def write_longbench_bundle(
+    subset: PreparedLongBenchSubset,
+    predictions: Sequence[LongBenchPrediction],
+    report: LongBenchScoreReport,
+    output_directory: Path,
+    *,
+    execution_config: Mapping[str, Any],
+    recorded_at_utc: datetime | None = None,
+) -> Path:
+    """Write cases, provider outputs, scores, and provenance as one immutable bundle."""
+    if len(predictions) != report.prediction_count:
+        raise ValueError("LongBench report count does not match predictions")
+    recorded_at = recorded_at_utc or datetime.now(UTC)
+    embedding = DeterministicEmbeddingProvider()
+    environment = capture_environment(
+        recorded_at_utc=recorded_at,
+        embedding_provider="deterministic",
+        embedding_model=embedding.model_name,
+        llm_provider=report.provider,
+        llm_model=report.model,
+        dependency_names=("datasets", "openai"),
+    )
+    strategies = sorted({prediction.strategy for prediction in predictions})
+    config = {
+        "schema_version": "1.0",
+        "benchmark": "longbench-subset",
+        "prepared_sha256": report.prepared_sha256,
+        "profile": subset.profile.value,
+        "source_repository": subset.source_repository,
+        "source_revision": subset.source_revision,
+        "source_split": subset.source_split,
+        "sampling_seed": subset.sampling_seed,
+        "provider": report.provider,
+        "model": report.model,
+        "strategies": strategies,
+        "execution": dict(execution_config),
+    }
+    metrics = {
+        "schema_version": report.schema_version,
+        "prepared_sha256": report.prepared_sha256,
+        "prediction_count": report.prediction_count,
+        "case_scores": [score.model_dump(mode="json") for score in report.case_scores],
+        "dataset_aggregates": [
+            aggregate.model_dump(mode="json") for aggregate in report.dataset_aggregates
+        ],
+    }
+    report_lines = [
+        "# LongBench Subset Report",
+        "",
+        f"- Provider/model: `{report.provider}/{report.model}`",
+        f"- Profile: `{subset.profile.value}`",
+        f"- Cases: {len(subset.cases)}",
+        f"- Predictions: {len(predictions)}",
+        "",
+        "| Dataset | Strategy | Metric | Successful | Mean score | Quality retention |",
+        "|---|---|---|---:|---:|---:|",
+    ]
+    report_lines.extend(
+        "| "
+        f"{value.dataset} | {value.strategy} | {value.metric.value} | "
+        f"{value.successful_case_count}/{value.case_count} | "
+        f"{value.mean_score if value.mean_score is not None else 'n/a'} | "
+        f"{value.mean_quality_retention if value.mean_quality_retention is not None else 'n/a'} |"
+        for value in report.dataset_aggregates
+    )
+    report_lines.extend(
+        [
+            "",
+            "Raw `cases.jsonl` and `predictions.jsonl` are authoritative; this report is derived.",
+        ]
+    )
+    return write_benchmark_bundle(
+        output_directory=output_directory,
+        recorded_at_utc=recorded_at,
+        strategy="comparison",
+        profile=subset.profile.value,
+        config=config,
+        environment=environment,
+        cases=subset.cases,
+        predictions=predictions,
+        metrics=metrics,
+        metric_rows=[value.model_dump(mode="json") for value in report.dataset_aggregates],
+        report="\n".join(report_lines),
+    )
