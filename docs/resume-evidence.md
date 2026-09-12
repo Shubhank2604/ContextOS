@@ -39,9 +39,9 @@ Safe to use on resume: no.
 
 Claim: The position-aware layout preserves accuracy across tested evidence positions.
 Metric: 1.0 accuracy and 0.0 max-min positional gap in the quick deterministic fixture.
-Benchmark: Controlled positional retrieval quick profile.
-Result artifact: `benchmarks/results/20260911T145313.548996Z-layout-comparison-quick/` (`metrics.json`).
-Configuration: deterministic provider; 4K bucket; five evidence positions; three layouts.
-Sample size: 15 position/layout cells (one case per cell).
+Benchmark: Controlled positional retrieval full profile.
+Result artifact: `benchmarks/results/20260912T061650.541411Z-layout-comparison-full/` (`metrics.json`).
+Configuration: deterministic provider; 4K, 8K, 16K, and 32K buckets; five evidence positions; three layouts.
+Sample size: 60 position/layout cells (four context buckets × five positions × three layouts).
 Limitations: Deterministic callback is position-invariant and cannot reproduce model positional degradation; this is plumbing validation, not a Lost-in-the-Middle result.
 Safe to use on resume: no.
