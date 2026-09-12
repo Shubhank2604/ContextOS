@@ -36,7 +36,7 @@ contextos benchmark run \
 
 The shared runner evaluates Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and ContextOS. Full Context receives enough budget to act as the quality reference; other strategies use the case's configured optimization budget. Each raw result contains task-specific required-fact score, quality retention, Critical Information Recall, input tokens, context reduction, compression ratio, optimizer/embedding/compression timing, selected IDs, and decision reasons.
 
-Aggregate reports retain p50/p95 optimizer latency and deterministic bootstrap 95% confidence intervals when at least 20 successful cases are available. Generated artifacts are content-addressed and ignored by default until a later validation phase explicitly approves an immutable result for version control. No benchmark result is hand-authored.
+Aggregate reports retain total/p50/p95 optimizer latency, embedding/compression-stage time, and native process peak memory, alongside deterministic bootstrap 95% confidence intervals when at least 20 successful cases are available. Generated artifacts are content-addressed and ignored by default until a later validation phase explicitly approves an immutable result for version control. No benchmark result is hand-authored.
 
 Run the Phase 4E single-component study with:
 

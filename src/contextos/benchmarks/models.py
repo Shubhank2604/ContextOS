@@ -229,6 +229,13 @@ class BenchmarkAggregate(BaseModel):
     mean_compression_ratio: float | None = Field(default=None, ge=0.0)
     p50_optimizer_latency_ms: float = Field(ge=0.0)
     p95_optimizer_latency_ms: float = Field(ge=0.0)
+    total_optimizer_wall_time_ms: float = Field(ge=0.0)
+    mean_embedding_time_ms: float = Field(ge=0.0)
+    mean_compression_time_ms: float = Field(ge=0.0)
+    mean_model_ttft_ms: float | None = Field(default=None, ge=0.0)
+    total_model_latency_ms: float | None = Field(default=None, ge=0.0)
+    total_output_tokens: int | None = Field(default=None, ge=0)
+    total_cached_tokens: int | None = Field(default=None, ge=0)
     task_score_ci95: ConfidenceInterval | None = None
     cir_ci95: ConfidenceInterval | None = None
 
@@ -251,7 +258,7 @@ class BenchmarkRun(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     run_id: str
     recorded_at_utc: datetime
     dataset_name: str
@@ -263,4 +270,5 @@ class BenchmarkRun(BaseModel):
     measurements: list[BenchmarkMeasurement]
     aggregates: list[BenchmarkAggregate]
     paired_comparisons: list[PairedMetricComparison] = Field(default_factory=list)
+    peak_process_memory_bytes: int | None = Field(default=None, ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)

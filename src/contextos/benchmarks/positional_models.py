@@ -124,12 +124,28 @@ class PositionalRobustness(BaseModel):
     positional_std_dev: float = Field(ge=0.0)
 
 
+class PositionalPerformance(BaseModel):
+    """Provider performance summary for one positional strategy."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    strategy: PositionalStrategy
+    prediction_count: int = Field(gt=0)
+    mean_estimated_input_tokens: float = Field(ge=0.0)
+    total_model_latency_ms: float = Field(ge=0.0)
+    p50_model_latency_ms: float = Field(ge=0.0)
+    p95_model_latency_ms: float = Field(ge=0.0)
+    mean_model_ttft_ms: float | None = Field(default=None, ge=0.0)
+    total_output_tokens: int | None = Field(default=None, ge=0)
+    total_cached_tokens: int | None = Field(default=None, ge=0)
+
+
 class PositionalRun(BaseModel):
     """Immutable raw artifact for a positional-retrieval execution."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     run_id: str
     recorded_at_utc: datetime
     dataset_sha256: str
@@ -147,4 +163,5 @@ class PositionalRun(BaseModel):
     predictions: list[PositionalPrediction]
     accuracy_cells: list[PositionAccuracy]
     robustness: list[PositionalRobustness]
+    performance: list[PositionalPerformance]
     metadata: dict[str, str | int | float | bool]

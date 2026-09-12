@@ -18,6 +18,12 @@ def test_all_fifty_base_cases_produce_raw_results_and_confidence_intervals() -> 
     assert all(aggregate.case_count == 50 for aggregate in run.aggregates)
     assert all(aggregate.task_score_ci95 is not None for aggregate in run.aggregates)
     assert all(aggregate.cir_ci95 is not None for aggregate in run.aggregates)
+    assert all(aggregate.total_optimizer_wall_time_ms > 0.0 for aggregate in run.aggregates)
+    assert all(aggregate.p50_optimizer_latency_ms > 0.0 for aggregate in run.aggregates)
+    assert all(aggregate.p95_optimizer_latency_ms > 0.0 for aggregate in run.aggregates)
+    assert all(aggregate.mean_embedding_time_ms >= 0.0 for aggregate in run.aggregates)
+    assert all(aggregate.mean_compression_time_ms >= 0.0 for aggregate in run.aggregates)
+    assert run.peak_process_memory_bytes is not None and run.peak_process_memory_bytes > 0
     assert len(run.paired_comparisons) == 27
     assert all(comparison.case_count == 50 for comparison in run.paired_comparisons)
     assert all(comparison.delta_ci95 is not None for comparison in run.paired_comparisons)

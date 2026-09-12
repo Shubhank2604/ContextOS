@@ -85,6 +85,8 @@ def test_run_artifacts_are_content_addressed_and_immutable(tmp_path: Path) -> No
     assert path.name.endswith("-comparison-limited-1")
     config = json.loads((path / "config.json").read_text(encoding="utf-8"))
     assert config["statistics"]["minimum_sample_size"] == 20
+    metrics = json.loads((path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["performance"]["peak_process_memory_bytes"] > 0
     conflicting = run.model_copy(update={"metadata": {**run.metadata, "different": True}})
     with pytest.raises(ValueError, match="collision"):
         write_run_artifact(

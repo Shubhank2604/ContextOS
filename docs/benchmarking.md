@@ -36,6 +36,14 @@ Real-model runners use temperature `0` where the provider supports it. Every imm
 
 Runs are not repeated mechanically. A critical comparison is repeated with the identical configuration only when residual model nondeterminism is large enough to change the qualitative conclusion; every repetition remains a separate immutable bundle. Deterministic evaluators and seeded bootstrap calculations are reproducible from the retained per-case records.
 
+## Phase 4H performance protocol
+
+Each ContextOS-Bench case records optimizer wall time from `time.perf_counter`, and the aggregate reports total, p50, and p95 optimizer latency plus mean embedding and compression-stage time. LongBench records those same optimizer fields alongside provider wall time, model TTFT when exposed, output/cached tokens, and input-context tokens. Positional runs report provider total, p50/p95 latency, input tokens, and output/cache totals per strategy.
+
+Peak memory is measured with the native platform counter (`GetProcessMemoryInfo` on Windows and `resource.getrusage` on Unix-like systems). It is a process-lifetime peak resident-set observation: it is useful for capacity tracking, but cannot be attributed to one strategy or treated as a per-call allocation measurement. No profiler that changes optimizer timing is enabled during these wall-clock measurements.
+
+Performance artifacts preserve raw per-case/per-invocation telemetry and deterministic derived summaries. A lower token count or latency is not accepted as an optimization by itself; any future optimization must be compared against the same cases, policy, tokenizer, provider/model, and decoding configuration while checking task score and Critical Information Recall for regression.
+
 ## Phase 4B controlled positional experiment
 
 This is a **controlled reproduction inspired by the paper**, not a reproduction of every experiment in *Lost in the Middle*. It tests exact key-value retrieval while varying target input length (4K, 8K, 16K, and 32K tokens), original evidence position (beginning, 25%, middle, 75%, and end), and layout (original/full, relevance descending, and ContextOS position aware).

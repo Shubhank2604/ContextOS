@@ -14,11 +14,13 @@ from time import perf_counter
 
 from contextos import __version__
 from contextos.benchmarks.bundles import capture_environment, write_benchmark_bundle
+from contextos.benchmarks.metrics import percentile
 from contextos.benchmarks.positional_models import (
     EvidencePosition,
     PositionAccuracy,
     PositionalCase,
     PositionalDataset,
+    PositionalPerformance,
     PositionalPrediction,
     PositionalRobustness,
     PositionalRun,
@@ -323,6 +325,52 @@ def aggregate_positional_predictions(
     return cells, robustness
 
 
+def aggregate_positional_performance(
+    predictions: Sequence[PositionalPrediction],
+) -> list[PositionalPerformance]:
+    """Aggregate provider telemetry independently for each layout strategy."""
+    performance: list[PositionalPerformance] = []
+    for strategy in sorted(
+        {prediction.strategy for prediction in predictions}, key=lambda x: x.value
+    ):
+        values = [prediction for prediction in predictions if prediction.strategy is strategy]
+        latencies = [prediction.model_total_latency_ms for prediction in values]
+        ttfts = [
+            prediction.model_ttft_ms
+            for prediction in values
+            if prediction.model_ttft_ms is not None
+        ]
+        output_tokens = [
+            prediction.output_tokens
+            for prediction in values
+            if prediction.output_tokens is not None
+        ]
+        cached_tokens = [
+            prediction.cached_tokens
+            for prediction in values
+            if prediction.cached_tokens is not None
+        ]
+        performance.append(
+            PositionalPerformance(
+                strategy=strategy,
+                prediction_count=len(values),
+                mean_estimated_input_tokens=mean(
+                    prediction.provider_input_tokens
+                    if prediction.provider_input_tokens is not None
+                    else prediction.estimated_input_tokens
+                    for prediction in values
+                ),
+                total_model_latency_ms=sum(latencies),
+                p50_model_latency_ms=percentile(latencies, 0.5),
+                p95_model_latency_ms=percentile(latencies, 0.95),
+                mean_model_ttft_ms=mean(ttfts) if ttfts else None,
+                total_output_tokens=sum(output_tokens) if output_tokens else None,
+                total_cached_tokens=sum(cached_tokens) if cached_tokens else None,
+            )
+        )
+    return performance
+
+
 def run_positional_benchmark(
     dataset: PositionalDataset,
     *,
@@ -361,6 +409,7 @@ def run_positional_benchmark(
             for strategy in strategies
         )
     cells, robustness = aggregate_positional_predictions(predictions)
+    performance = aggregate_positional_performance(predictions)
     dataset_sha = hashlib.sha256(dataset.model_dump_json().encode("utf-8")).hexdigest()
     recorded_at = datetime.now(UTC)
     identity = "|".join(
@@ -391,6 +440,7 @@ def run_positional_benchmark(
         predictions=predictions,
         accuracy_cells=cells,
         robustness=robustness,
+        performance=performance,
         metadata={
             "controlled_reproduction": True,
             "paper_doi": "10.1162/tacl_a_00638",
@@ -439,12 +489,17 @@ def write_positional_run_artifact(
             "reason": "one observation per context-length, position, and strategy cell",
             "repeat_policy": "repeat only when model nondeterminism could change the conclusion",
         },
+        "performance_measurement": {
+            "provider_wall_clock": "time.perf_counter",
+            "provider_usage": "recorded when exposed by provider",
+        },
     }
     metrics = {
         "schema_version": "1.0",
         "run_id": run.run_id,
         "accuracy_cells": [value.model_dump(mode="json") for value in run.accuracy_cells],
         "robustness": [value.model_dump(mode="json") for value in run.robustness],
+        "performance": [value.model_dump(mode="json") for value in run.performance],
     }
     report = [
         "# Positional Retrieval Report",
@@ -467,6 +522,25 @@ def write_positional_run_artifact(
     report.extend(
         [
             "",
+            "## Provider performance",
+            "",
+            "| Strategy | Calls | Mean input tokens | Total latency ms | p50 ms | p95 ms | "
+            "Output tokens | Cached tokens |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    report.extend(
+        "| "
+        f"{value.strategy.value} | {value.prediction_count} | "
+        f"{value.mean_estimated_input_tokens:.2f} | {value.total_model_latency_ms:.3f} | "
+        f"{value.p50_model_latency_ms:.3f} | {value.p95_model_latency_ms:.3f} | "
+        f"{value.total_output_tokens if value.total_output_tokens is not None else 'n/a'} | "
+        f"{value.total_cached_tokens if value.total_cached_tokens is not None else 'n/a'} |"
+        for value in run.performance
+    )
+    report.extend(
+        [
+            "",
             "Raw `cases.jsonl` and `predictions.jsonl` are authoritative; this report is derived.",
         ]
     )
@@ -480,7 +554,16 @@ def write_positional_run_artifact(
         cases=cases,
         predictions=run.predictions,
         metrics=metrics,
-        metric_rows=[value.model_dump(mode="json") for value in run.robustness],
+        metric_rows=[
+            *(
+                {"record_type": "robustness", **value.model_dump(mode="json")}
+                for value in run.robustness
+            ),
+            *(
+                {"record_type": "performance", **value.model_dump(mode="json")}
+                for value in run.performance
+            ),
+        ],
         report="\n".join(report),
     )
 

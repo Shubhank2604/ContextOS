@@ -38,6 +38,8 @@ class FixedAnswerProvider:
             text=self.answer,
             input_tokens=len(prompt.split()),
             output_tokens=min(len(self.answer.split()), max_output_tokens),
+            cached_tokens=1,
+            ttft_ms=0.25,
             model="fixture-v1",
         )
 
@@ -109,6 +111,13 @@ def test_six_strategies_share_provider_model_cases_and_evaluator() -> None:
     assert all(prediction.model == "fixture-v1" for prediction in predictions)
     assert all(prediction.status == "ok" for prediction in predictions)
     assert all(prediction.prompt_input_tokens is not None for prediction in predictions)
+    assert all(prediction.optimizer_latency_ms is not None for prediction in predictions)
+    assert all(prediction.embedding_time_ms is not None for prediction in predictions)
+    assert all(prediction.compression_time_ms is not None for prediction in predictions)
+    assert all(prediction.provider_latency_ms is not None for prediction in predictions)
+    assert all(prediction.model_ttft_ms == 0.25 for prediction in predictions)
+    assert all(prediction.peak_process_memory_bytes for prediction in predictions)
+    assert all(prediction.stage_timings_ms for prediction in predictions)
     assert len(report.case_scores) == 6
     assert len(report.dataset_aggregates) == 6
     assert len(report.paired_comparisons) == 9
@@ -129,6 +138,18 @@ def test_six_strategies_share_provider_model_cases_and_evaluator() -> None:
     assert all(comparison.score_delta_ci95 is None for comparison in report.paired_comparisons)
     assert all(score.score == 1.0 for score in report.case_scores)
     assert all(score.quality_retention == 1.0 for score in report.case_scores)
+    assert all(
+        aggregate.total_optimizer_latency_ms is not None for aggregate in report.dataset_aggregates
+    )
+    assert all(
+        aggregate.p95_optimizer_latency_ms is not None for aggregate in report.dataset_aggregates
+    )
+    assert all(
+        aggregate.total_provider_latency_ms is not None for aggregate in report.dataset_aggregates
+    )
+    assert all(aggregate.total_output_tokens == 2 for aggregate in report.dataset_aggregates)
+    assert all(aggregate.total_cached_tokens == 1 for aggregate in report.dataset_aggregates)
+    assert report.peak_process_memory_bytes is not None and report.peak_process_memory_bytes > 0
 
 
 def test_longbench_comparison_writes_complete_execution_bundle(tmp_path: Path) -> None:
@@ -164,6 +185,8 @@ def test_longbench_comparison_writes_complete_execution_bundle(tmp_path: Path) -
     assert config["execution"]["context_budget_tokens"] == 8
     assert config["execution"]["temperature"] == 0.0
     assert config["statistics"]["minimum_sample_size"] == 20
+    metrics = json.loads((path / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["performance"]["peak_process_memory_bytes"] > 0
     assert config["source_revision"] == "fixture-revision"
     assert environment["llm_provider"] == "fixture"
     assert environment["llm_model"] == "fixture-v1"

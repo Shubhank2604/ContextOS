@@ -8,6 +8,7 @@ import pytest
 from contextos.benchmarks.bundles import REQUIRED_BUNDLE_FILES
 from contextos.benchmarks.positional import (
     REQUIRED_CONTEXT_LENGTHS,
+    aggregate_positional_performance,
     aggregate_positional_predictions,
     build_positional_dataset,
     construct_positional_prompt,
@@ -100,6 +101,9 @@ def test_offline_runner_exact_matches_and_enforces_provider_limit() -> None:
     assert len(run.predictions) == 15
     assert all(prediction.exact_match for prediction in run.predictions)
     assert all(metric.max_min_positional_gap == 0.0 for metric in run.robustness)
+    assert len(run.performance) == 3
+    assert all(value.prediction_count == 5 for value in run.performance)
+    assert all(value.total_model_latency_ms >= 0.0 for value in run.performance)
 
 
 def _raw_prediction(position: EvidencePosition, *, exact_match: bool) -> PositionalPrediction:
@@ -132,6 +136,12 @@ def test_aggregation_reports_position_gap_variance_and_tokens() -> None:
     assert robustness[0].max_min_positional_gap == 1.0
     assert robustness[0].positional_variance == pytest.approx(0.16)
     assert robustness[0].positional_std_dev == pytest.approx(0.4)
+    performance = aggregate_positional_performance(predictions)
+    assert performance[0].prediction_count == 5
+    assert performance[0].mean_estimated_input_tokens == 4_090
+    assert performance[0].total_model_latency_ms == 50.0
+    assert performance[0].p50_model_latency_ms == 10.0
+    assert performance[0].p95_model_latency_ms == 10.0
 
 
 def test_positional_artifacts_are_immutable(tmp_path: Path) -> None:
@@ -152,6 +162,8 @@ def test_positional_artifacts_are_immutable(tmp_path: Path) -> None:
     assert {entry.name for entry in path.iterdir()} == REQUIRED_BUNDLE_FILES
     config = json.loads((path / "config.json").read_text(encoding="utf-8"))
     assert config["statistics"]["confidence_interval"] == "not reported"
+    metrics = json.loads((path / "metrics.json").read_text(encoding="utf-8"))
+    assert len(metrics["performance"]) == 1
     conflicting = run.model_copy(update={"provider": "different"})
     with pytest.raises(ValueError, match="collision"):
         write_positional_run_artifact(conflicting, tmp_path, dataset=dataset)

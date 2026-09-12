@@ -7,7 +7,6 @@ import platform
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from time import perf_counter
 from typing import Protocol
 
 from contextos import __version__
@@ -31,6 +30,7 @@ from contextos.benchmarks.models import (
     ContextOSBenchCase,
     ContextOSBenchDataset,
 )
+from contextos.benchmarks.performance import measure_performance
 from contextos.errors import ContextBudgetOverflow
 from contextos.optimizer import ContextOptimizer
 from contextos.tokenization import Tokenizer
@@ -184,25 +184,25 @@ def _run_case(
     strategy: BenchmarkStrategy,
     tokenizer: Tokenizer,
 ) -> BenchmarkMeasurement:
-    started = perf_counter()
     try:
-        result = strategy.optimize(case, tokenizer)
+        with measure_performance() as probe:
+            result = strategy.optimize(case, tokenizer)
     except ContextBudgetOverflow as exc:
-        elapsed = (perf_counter() - started) * 1000
-        return failed_measurement(
+        failure = failed_measurement(
             case,
             strategy=strategy.name,
             status="overflow",
-            optimizer_wall_time_ms=elapsed,
+            optimizer_wall_time_ms=probe.wall_time_ms,
             warning=str(exc),
         )
-    elapsed = (perf_counter() - started) * 1000
-    return measurement_from_result(
+        return failure.model_copy(update={"peak_memory_bytes": probe.peak_process_memory_bytes})
+    measurement = measurement_from_result(
         case,
         result,
         strategy=strategy.name,
-        optimizer_wall_time_ms=elapsed,
+        optimizer_wall_time_ms=probe.wall_time_ms,
     )
+    return measurement.model_copy(update={"peak_memory_bytes": probe.peak_process_memory_bytes})
 
 
 def run_contextos_bench(
@@ -294,6 +294,14 @@ def run_contextos_bench(
             bootstrap_seed=dataset.generation_seed,
         ),
         paired_comparisons=paired_comparisons,
+        peak_process_memory_bytes=max(
+            (
+                measurement.peak_memory_bytes
+                for measurement in measurements
+                if measurement.peak_memory_bytes is not None
+            ),
+            default=None,
+        ),
         metadata={
             "case_count": len(selected_cases),
             "base_case_count": sum(case in dataset.base_cases for case in selected_cases),

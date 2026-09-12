@@ -208,6 +208,26 @@ def aggregate_measurements(
             if measurement.compression_ratio is not None
         ]
         latencies = [measurement.optimizer_wall_time_ms for measurement in successful]
+        model_ttfts = [
+            measurement.model_ttft_ms
+            for measurement in successful
+            if measurement.model_ttft_ms is not None
+        ]
+        model_latencies = [
+            measurement.model_total_latency_ms
+            for measurement in successful
+            if measurement.model_total_latency_ms is not None
+        ]
+        output_tokens = [
+            measurement.output_tokens
+            for measurement in successful
+            if measurement.output_tokens is not None
+        ]
+        cached_tokens = [
+            measurement.cached_tokens
+            for measurement in successful
+            if measurement.cached_tokens is not None
+        ]
         strategy_seed = bootstrap_seed + int.from_bytes(
             hashlib.sha256(strategy.encode("utf-8")).digest()[:4], "big"
         )
@@ -231,6 +251,23 @@ def aggregate_measurements(
                 mean_compression_ratio=mean(ratios) if ratios else None,
                 p50_optimizer_latency_ms=percentile(latencies, 0.5) if latencies else 0.0,
                 p95_optimizer_latency_ms=percentile(latencies, 0.95) if latencies else 0.0,
+                total_optimizer_wall_time_ms=sum(
+                    measurement.optimizer_wall_time_ms for measurement in strategy_measurements
+                ),
+                mean_embedding_time_ms=(
+                    mean(measurement.embedding_time_ms for measurement in successful)
+                    if successful
+                    else 0.0
+                ),
+                mean_compression_time_ms=(
+                    mean(measurement.compression_time_ms for measurement in successful)
+                    if successful
+                    else 0.0
+                ),
+                mean_model_ttft_ms=mean(model_ttfts) if model_ttfts else None,
+                total_model_latency_ms=sum(model_latencies) if model_latencies else None,
+                total_output_tokens=sum(output_tokens) if output_tokens else None,
+                total_cached_tokens=sum(cached_tokens) if cached_tokens else None,
                 task_score_ci95=(
                     bootstrap_mean_ci(task_scores, seed=strategy_seed) if enough_for_ci else None
                 ),

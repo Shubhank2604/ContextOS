@@ -134,7 +134,12 @@ class LongBenchPrediction(BaseModel):
     cached_tokens: int | None = Field(default=None, ge=0)
     context_reduction: float | None = Field(default=None, ge=0.0, le=1.0)
     optimizer_latency_ms: float | None = Field(default=None, ge=0.0)
+    embedding_time_ms: float | None = Field(default=None, ge=0.0)
+    compression_time_ms: float | None = Field(default=None, ge=0.0)
     provider_latency_ms: float | None = Field(default=None, ge=0.0)
+    model_ttft_ms: float | None = Field(default=None, ge=0.0)
+    peak_process_memory_bytes: int | None = Field(default=None, ge=0)
+    stage_timings_ms: dict[str, float] = Field(default_factory=dict)
     selected_item_ids: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -185,6 +190,16 @@ class LongBenchDatasetAggregate(BaseModel):
     mean_quality_retention: float | None = Field(default=None, ge=0.0)
     score_ci95: ConfidenceInterval | None = None
     quality_retention_ci95: ConfidenceInterval | None = None
+    mean_input_context_tokens: float | None = Field(default=None, ge=0.0)
+    total_optimizer_latency_ms: float | None = Field(default=None, ge=0.0)
+    p50_optimizer_latency_ms: float | None = Field(default=None, ge=0.0)
+    p95_optimizer_latency_ms: float | None = Field(default=None, ge=0.0)
+    mean_embedding_time_ms: float | None = Field(default=None, ge=0.0)
+    mean_compression_time_ms: float | None = Field(default=None, ge=0.0)
+    total_provider_latency_ms: float | None = Field(default=None, ge=0.0)
+    mean_model_ttft_ms: float | None = Field(default=None, ge=0.0)
+    total_output_tokens: int | None = Field(default=None, ge=0)
+    total_cached_tokens: int | None = Field(default=None, ge=0)
 
 
 class LongBenchPairedComparison(BaseModel):
@@ -206,7 +221,7 @@ class LongBenchScoreReport(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     prepared_sha256: str
     prediction_count: int = Field(gt=0)
     provider: str
@@ -214,3 +229,4 @@ class LongBenchScoreReport(BaseModel):
     case_scores: list[LongBenchCaseScore]
     dataset_aggregates: list[LongBenchDatasetAggregate]
     paired_comparisons: list[LongBenchPairedComparison] = Field(default_factory=list)
+    peak_process_memory_bytes: int | None = Field(default=None, ge=0)

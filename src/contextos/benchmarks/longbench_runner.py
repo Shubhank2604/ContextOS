@@ -20,6 +20,7 @@ from contextos.benchmarks.longbench_models import (
     LongBenchPrediction,
     PreparedLongBenchSubset,
 )
+from contextos.benchmarks.performance import measure_performance
 from contextos.config import OptimizationPolicy
 from contextos.errors import ContextOSError
 from contextos.models import ContextItem, ContextType
@@ -141,6 +142,11 @@ def _failed_prediction(
     provider_model: str,
     original_tokens: int,
     optimizer_latency_ms: float | None = None,
+    embedding_time_ms: float | None = None,
+    compression_time_ms: float | None = None,
+    provider_latency_ms: float | None = None,
+    peak_process_memory_bytes: int | None = None,
+    stage_timings_ms: dict[str, float] | None = None,
 ) -> LongBenchPrediction:
     return LongBenchPrediction(
         dataset=case.dataset,
@@ -152,6 +158,11 @@ def _failed_prediction(
         model=provider_model,
         original_context_tokens=original_tokens,
         optimizer_latency_ms=optimizer_latency_ms,
+        embedding_time_ms=embedding_time_ms,
+        compression_time_ms=compression_time_ms,
+        provider_latency_ms=provider_latency_ms,
+        peak_process_memory_bytes=peak_process_memory_bytes,
+        stage_timings_ms=stage_timings_ms or {},
         warnings=[warning],
     )
 
@@ -197,14 +208,14 @@ def _run_strategy(
         strategy_budget = max(sum(tokenizer.count_tokens(item.content) for item in items), 1)
     else:
         strategy_budget = min(context_budget_tokens, available_context_tokens)
-    optimize_started = perf_counter()
     try:
-        result = strategy.optimize(
-            task=case.input,
-            items=items,
-            policy=_policy(strategy_budget),
-            tokenizer=tokenizer,
-        )
+        with measure_performance() as probe:
+            result = strategy.optimize(
+                task=case.input,
+                items=items,
+                policy=_policy(strategy_budget),
+                tokenizer=tokenizer,
+            )
     except (ContextOSError, ValueError) as exc:
         return _failed_prediction(
             case,
@@ -214,9 +225,15 @@ def _run_strategy(
             provider_name=provider_name,
             provider_model=provider_model,
             original_tokens=original_tokens,
-            optimizer_latency_ms=(perf_counter() - optimize_started) * 1_000,
+            optimizer_latency_ms=probe.wall_time_ms,
+            peak_process_memory_bytes=probe.peak_process_memory_bytes,
         )
-    optimizer_latency_ms = (perf_counter() - optimize_started) * 1_000
+    optimizer_latency_ms = probe.wall_time_ms
+    timings = result.trace.stage_timings_ms
+    embedding_time_ms = sum(
+        timings.get(stage, 0.0) for stage in ("semantic_dedup", "relevance", "novelty")
+    )
+    compression_time_ms = timings.get("compression", 0.0)
     selected_context = "".join(item.content for item in result.selected_items)
     input_context_tokens = tokenizer.count_tokens(selected_context)
     prompt = render_longbench_prompt(case, context=selected_context)
@@ -231,11 +248,16 @@ def _run_strategy(
             provider_model=provider_model,
             original_tokens=original_tokens,
             optimizer_latency_ms=optimizer_latency_ms,
+            embedding_time_ms=embedding_time_ms,
+            compression_time_ms=compression_time_ms,
+            peak_process_memory_bytes=probe.peak_process_memory_bytes,
+            stage_timings_ms=timings,
         )
     provider_started = perf_counter()
     try:
         response = provider.complete(prompt, max_output_tokens=case.max_output_tokens)
     except ContextOSError as exc:
+        provider_latency_ms = (perf_counter() - provider_started) * 1_000
         return _failed_prediction(
             case,
             strategy=strategy.name,
@@ -245,6 +267,11 @@ def _run_strategy(
             provider_model=provider_model,
             original_tokens=original_tokens,
             optimizer_latency_ms=optimizer_latency_ms,
+            embedding_time_ms=embedding_time_ms,
+            compression_time_ms=compression_time_ms,
+            provider_latency_ms=provider_latency_ms,
+            peak_process_memory_bytes=probe.peak_process_memory_bytes,
+            stage_timings_ms=timings,
         )
     provider_latency_ms = (perf_counter() - provider_started) * 1_000
     reduction = 0.0 if original_tokens == 0 else 1 - input_context_tokens / original_tokens
@@ -264,7 +291,12 @@ def _run_strategy(
         cached_tokens=response.cached_tokens,
         context_reduction=max(0.0, min(reduction, 1.0)),
         optimizer_latency_ms=optimizer_latency_ms,
+        embedding_time_ms=embedding_time_ms,
+        compression_time_ms=compression_time_ms,
         provider_latency_ms=provider_latency_ms,
+        model_ttft_ms=response.ttft_ms,
+        peak_process_memory_bytes=probe.peak_process_memory_bytes,
+        stage_timings_ms=timings,
         selected_item_ids=[item.id for item in result.selected_items],
         warnings=result.trace.warnings,
     )

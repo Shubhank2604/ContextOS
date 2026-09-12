@@ -35,8 +35,13 @@ from contextos.benchmarks.metrics import (
     DEFAULT_BOOTSTRAP_RESAMPLES,
     MIN_BOOTSTRAP_SAMPLE_SIZE,
     bootstrap_mean_ci,
+    percentile,
 )
 from contextos.embeddings import DeterministicEmbeddingProvider
+
+
+def _display_optional(value: int | float | None) -> int | float | str:
+    return "n/a" if value is None else value
 
 
 class LongBenchSource(Protocol):
@@ -362,6 +367,51 @@ def score_longbench_predictions(
             if score.quality_retention is not None
         ]
         score_values = [score.score for score in successful_scores if score.score is not None]
+        aggregate_predictions = [
+            prediction
+            for prediction in predictions
+            if prediction.dataset == dataset and prediction.strategy == strategy
+        ]
+        input_tokens = [
+            prediction.input_context_tokens
+            for prediction in aggregate_predictions
+            if prediction.input_context_tokens is not None
+        ]
+        optimizer_latencies = [
+            prediction.optimizer_latency_ms
+            for prediction in aggregate_predictions
+            if prediction.optimizer_latency_ms is not None
+        ]
+        embedding_times = [
+            prediction.embedding_time_ms
+            for prediction in aggregate_predictions
+            if prediction.embedding_time_ms is not None
+        ]
+        compression_times = [
+            prediction.compression_time_ms
+            for prediction in aggregate_predictions
+            if prediction.compression_time_ms is not None
+        ]
+        provider_latencies = [
+            prediction.provider_latency_ms
+            for prediction in aggregate_predictions
+            if prediction.provider_latency_ms is not None
+        ]
+        model_ttfts = [
+            prediction.model_ttft_ms
+            for prediction in aggregate_predictions
+            if prediction.model_ttft_ms is not None
+        ]
+        output_tokens = [
+            prediction.output_tokens
+            for prediction in aggregate_predictions
+            if prediction.output_tokens is not None
+        ]
+        cached_tokens = [
+            prediction.cached_tokens
+            for prediction in aggregate_predictions
+            if prediction.cached_tokens is not None
+        ]
         seed_material = f"{prepared_sha}|{dataset}|{strategy}|{aggregate_scores[0].metric}".encode()
         aggregate_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:4], "big")
         aggregates.append(
@@ -383,6 +433,22 @@ def score_longbench_predictions(
                     if len(quality_retentions) >= MIN_BOOTSTRAP_SAMPLE_SIZE
                     else None
                 ),
+                mean_input_context_tokens=mean(input_tokens) if input_tokens else None,
+                total_optimizer_latency_ms=(
+                    sum(optimizer_latencies) if optimizer_latencies else None
+                ),
+                p50_optimizer_latency_ms=(
+                    percentile(optimizer_latencies, 0.5) if optimizer_latencies else None
+                ),
+                p95_optimizer_latency_ms=(
+                    percentile(optimizer_latencies, 0.95) if optimizer_latencies else None
+                ),
+                mean_embedding_time_ms=mean(embedding_times) if embedding_times else None,
+                mean_compression_time_ms=(mean(compression_times) if compression_times else None),
+                total_provider_latency_ms=(sum(provider_latencies) if provider_latencies else None),
+                mean_model_ttft_ms=mean(model_ttfts) if model_ttfts else None,
+                total_output_tokens=sum(output_tokens) if output_tokens else None,
+                total_cached_tokens=sum(cached_tokens) if cached_tokens else None,
             )
         )
     paired_comparisons: list[LongBenchPairedComparison] = []
@@ -445,6 +511,14 @@ def score_longbench_predictions(
         case_scores=case_scores,
         dataset_aggregates=aggregates,
         paired_comparisons=paired_comparisons,
+        peak_process_memory_bytes=max(
+            (
+                prediction.peak_process_memory_bytes
+                for prediction in predictions
+                if prediction.peak_process_memory_bytes is not None
+            ),
+            default=None,
+        ),
     )
 
 
@@ -491,11 +565,20 @@ def write_longbench_bundle(
             "minimum_sample_size": MIN_BOOTSTRAP_SAMPLE_SIZE,
             "repeat_policy": "repeat only when model nondeterminism could change the conclusion",
         },
+        "performance_measurement": {
+            "optimizer_wall_clock": "time.perf_counter",
+            "provider_wall_clock": "time.perf_counter",
+            "memory": "process-lifetime peak resident set from native OS counters",
+            "memory_is_process_rss": True,
+        },
     }
     metrics = {
         "schema_version": report.schema_version,
         "prepared_sha256": report.prepared_sha256,
         "prediction_count": report.prediction_count,
+        "performance": {
+            "peak_process_memory_bytes": report.peak_process_memory_bytes,
+        },
         "case_scores": [score.model_dump(mode="json") for score in report.case_scores],
         "dataset_aggregates": [
             aggregate.model_dump(mode="json") for aggregate in report.dataset_aggregates
@@ -521,6 +604,34 @@ def write_longbench_bundle(
         f"{value.successful_case_count}/{value.case_count} | "
         f"{value.mean_score if value.mean_score is not None else 'n/a'} | "
         f"{value.mean_quality_retention if value.mean_quality_retention is not None else 'n/a'} |"
+        for value in report.dataset_aggregates
+    )
+    report_lines.extend(
+        [
+            "",
+            "## Runtime performance",
+            "",
+            f"Observed process peak resident memory: "
+            f"{_display_optional(report.peak_process_memory_bytes)} bytes. "
+            "It is process-wide and must not be attributed to an individual strategy.",
+            "",
+            "| Dataset | Strategy | Mean input | Optimizer total ms | p50 ms | p95 ms | "
+            "Embedding ms | Compression ms | Provider total ms | Output tokens | Cached tokens |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    report_lines.extend(
+        "| "
+        f"{value.dataset} | {value.strategy} | "
+        f"{_display_optional(value.mean_input_context_tokens)} | "
+        f"{_display_optional(value.total_optimizer_latency_ms)} | "
+        f"{_display_optional(value.p50_optimizer_latency_ms)} | "
+        f"{_display_optional(value.p95_optimizer_latency_ms)} | "
+        f"{_display_optional(value.mean_embedding_time_ms)} | "
+        f"{_display_optional(value.mean_compression_time_ms)} | "
+        f"{_display_optional(value.total_provider_latency_ms)} | "
+        f"{_display_optional(value.total_output_tokens)} | "
+        f"{_display_optional(value.total_cached_tokens)} |"
         for value in report.dataset_aggregates
     )
     if report.paired_comparisons:
