@@ -8,6 +8,8 @@ The external-validation adapter configures a reproducible LongBench subset spann
 
 The detailed build specification and live project status are maintained locally during development. Checked-in version changes are recorded in [`CHANGELOG.md`](CHANGELOG.md).
 
+The current local benchmark draft is [`benchmarks/reports/v0.4.0.md`](benchmarks/reports/v0.4.0.md); metric provenance and publication gates are tracked in [`docs/resume-evidence.md`](docs/resume-evidence.md).
+
 ## Development setup
 
 ContextOS requires Python 3.11 or newer.

@@ -8,6 +8,8 @@ The project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 4J/4K/4L documentation hardening: local v0.4.0 benchmark report, explicit resume-evidence ledger, limitations, and release-gate language.
+
 - Phase 4H performance telemetry for optimizer wall time, p50/p95/total latency, embedding and compression stages, provider latency, TTFT, token/cache usage, positional provider summaries, and native process peak-memory provenance.
 - A standard-library performance probe that keeps wall-clock timings representative while explicitly labeling process-lifetime memory observations as non-attributable to individual strategies.
 - Phase 4G paired statistical reporting with seeded 1,000-resample bootstrap 95% confidence intervals for sufficiently large ContextOS-Bench and per-dataset LongBench samples.
