@@ -13,6 +13,17 @@ Sample size: 50 paired cases per strategy.
 Limitations: Synthetic templated cases; ContextOS trails full, relevance-only, and naive extractive task/CIR scores on this run; no external model quality measurement.
 Safe to use on resume: no.
 
+## Claim: Standard model-backed external quality
+
+Claim: ContextOS preserves or improves quality on a broader LongBench subset.
+Metric: ContextOS mean scores: 0.700 2WikiMQA, 0.602 HotpotQA, 0.800 PassageRetrieval-en, 0.058 RepoBench-P; paired deltas versus Full Context: +0.140, -0.127, -0.200, -0.007.
+Benchmark: LongBench standard profile with OpenAI `gpt-5.4-mini`, temperature zero.
+Result artifact: `benchmarks/results/20260912T073904.437455Z-comparison-standard/` (`metrics.json`).
+Configuration: 100 cases, 600 predictions, 25 cases per dataset; 598 successful predictions and 2 explicit Full Context RepoBench-P context overflows; 1,000-resample intervals where sample support is available.
+Sample size: 25 cases per dataset; Full Context had 23 successful RepoBench-P cases because two inputs exceeded the declared provider context limit.
+Limitations: Results are dataset-specific and mixed; ContextOS is below Full Context on HotpotQA and PassageRetrieval-en; one model/profile only.
+Safe to use on resume: no.
+
 ## Claim: Model-backed external quality
 
 Claim: ContextOS preserves quality against Full Context on a LongBench subset.
