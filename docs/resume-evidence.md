@@ -13,6 +13,17 @@ Sample size: 50 paired cases per strategy.
 Limitations: Synthetic templated cases; ContextOS trails full, relevance-only, and naive extractive task/CIR scores on this run; no external model quality measurement.
 Safe to use on resume: no.
 
+## Claim: Model-backed external quality
+
+Claim: ContextOS preserves quality against Full Context on a LongBench subset.
+Metric: ContextOS matched Full Context per dataset on the quick run: 0.50 2WikiMQA, 0.90 HotpotQA, 1.00 PassageRetrieval-en, and 0.06 RepoBench-P code similarity.
+Benchmark: LongBench quick profile with OpenAI `gpt-5.4-mini`, temperature zero.
+Result artifact: `benchmarks/results/20260912T070845.650660Z-comparison-quick/` (`metrics.json`).
+Configuration: 8 cases, 6 strategies, 48 successful predictions; pinned LongBench revision `5e628be`.
+Sample size: 2 cases per dataset, 8 total.
+Limitations: Too small for confidence intervals or generalization; model and profile are explicitly part of the claim; RepoBench-P scores are low across all strategies.
+Safe to use on resume: no.
+
 ## Claim: Component ablation
 
 Claim: Dependency-aware scoring is measurable on the controlled benchmark.
