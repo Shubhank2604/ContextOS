@@ -55,6 +55,8 @@ contextos benchmark run \
 contextos benchmark ablation \
   --input benchmarks/datasets/contextos_bench.json \
   --output-directory benchmarks/results
+contextos benchmark constraints \
+  --output-directory benchmarks/results
 contextos benchmark dedup \
   --input benchmarks/datasets/deduplication_cases.json \
   --output-directory benchmarks/results
@@ -67,6 +69,8 @@ Full Context, Last-N, Sliding Window, Relevance Only, and Naive Extractive remai
 ContextOS-Bench contains 50 deterministic templated base cases across coding, research, and support/operations agents. Every run compares Full Context, Last-N, Sliding Window, Relevance Only, Naive Extractive, and ContextOS, retaining raw per-case task score, critical-information recall, token reduction, compression ratio, decision reasons, and optimizer timings. Reports include total/p50/p95 optimizer latency, embedding/compression stage time, and process peak-memory observations. Result artifacts are generated locally and are not treated as measured project claims until reviewed and committed through the later v0.4 validation phases.
 
 The ablation command runs full ContextOS and five single-component removals over the same cases and budgets. Artifacts record each policy override and report task-score, critical-information-recall, input-token, and p95 optimizer-latency deltas against full ContextOS.
+
+The separate Phase 5 constraint-sensitive track deterministically generates 90 cases across dependency, supersession, contradiction, exact-value, identifier, negation, tool-state, citation, and multi-hop categories. It retains the unchanged v0.4 strategies while adding constraint violation, dependency closure, state consistency, contradiction leakage, exact-value, identifier, and citation preservation metrics.
 
 Meaningful benchmark commands write immutable directories under `benchmarks/results/<timestamp>-<strategy>-<profile>/`. Each bundle contains `config.json`, `environment.json`, `cases.jsonl`, `predictions.jsonl`, `metrics.json`, `metrics.csv`, and `report.md`. Raw JSONL and JSON metrics are authoritative; CSV and Markdown are derived views. The quick callback remains an ephemeral CI smoke check.
 

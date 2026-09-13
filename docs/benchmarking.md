@@ -99,3 +99,21 @@ report.md
 `environment.json` records the Python and ContextOS versions, Git SHA, operating system, relevant installed dependency versions, embedding provider/model, and LLM provider/model when applicable. `config.json` records track-specific dataset identity, strategies, budgets, thresholds, source revisions, and decoding settings. Existing bundle paths are accepted only when all seven files match byte-for-byte; missing, added, or changed files are rejected as mutation or collision.
 
 Raw cases, predictions, and JSON metrics are the source of truth. CSV and Markdown are deterministic derived views for analysis and review. `contextos benchmark --profile quick` is intentionally excluded because it is an ephemeral CI smoke test rather than a meaningful research run. Generated bundles remain ignored until an explicit evidence review approves them for version control.
+
+## Phase 5 constraint-sensitive track
+
+`contextos benchmark constraints` runs a separate deterministic 90-case track without replacing ContextOS-Bench or changing the v0.4 strategies. Ten cases cover each of dependency closure, supersession, contradiction, exact numeric preservation, identifier preservation, negation/policy preservation, tool state, citation/evidence provenance, and multi-hop relations.
+
+Every case carries machine-readable critical item IDs, directed relations, exact values, identifiers, citations, forbidden item combinations, expected current state, and stale item IDs as applicable. The evaluator reports:
+
+- Critical Information Recall from the existing evaluator;
+- Constraint Violation Rate, where lower is better;
+- Dependency Closure Rate;
+- State Consistency Rate;
+- Contradiction Leakage Rate, where lower is better;
+- Exact Value Preservation Rate;
+- Identifier Preservation Rate;
+- Citation Preservation Rate;
+- existing task score, input tokens, context reduction, and optimizer latency.
+
+Constraint violation is binary per case: any applicable preservation rate below one, or any forbidden combination present, is a violation. Metrics with no applicable annotation are omitted from that case rather than counted as successes. Immutable artifacts record frozen v0.4 SHA `4fdd88391300c56ad17af5458897ccdd08d6f7bf` and the current research SHA.

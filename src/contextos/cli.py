@@ -22,6 +22,11 @@ from contextos.baselines import (
 from contextos.benchmarking import run_quick_benchmark, write_deduplication_benchmark_bundle
 from contextos.benchmarks.artifacts import load_dataset, write_run_artifact
 from contextos.benchmarks.bundles import load_benchmark_bundle
+from contextos.benchmarks.constraint_benchmark import (
+    run_constraint_benchmark,
+    write_constraint_artifact,
+)
+from contextos.benchmarks.constraint_dataset import generate_constraint_dataset
 from contextos.benchmarks.longbench import (
     HuggingFaceLongBenchSource,
     load_longbench_config,
@@ -258,6 +263,48 @@ def benchmark_run_command(
                 "artifact": str(artifact_path),
                 "case_count": run.metadata["case_count"],
                 "aggregates": [aggregate.model_dump(mode="json") for aggregate in run.aggregates],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+@benchmark_app.command("constraints")
+def benchmark_constraints_command(
+    output_directory: Annotated[Path, typer.Option("--output-directory")] = Path(
+        "benchmarks/results"
+    ),
+    case_limit: Annotated[int | None, typer.Option("--case-limit", min=1)] = None,
+) -> None:
+    """Run the separate Phase 5 constraint-sensitive benchmark track."""
+    try:
+        dataset = generate_constraint_dataset()
+        run, measurements, aggregates = run_constraint_benchmark(
+            dataset,
+            tokenizer=TiktokenTokenizer(),
+            case_limit=case_limit,
+        )
+        artifact_path = write_constraint_artifact(
+            output_directory,
+            dataset=dataset,
+            run=run,
+            measurements=measurements,
+            aggregates=aggregates,
+            profile="full" if case_limit is None else f"limited-{case_limit}",
+        )
+    except (ContextOSError, OSError, ValueError, ValidationError) as exc:
+        typer.echo(f"Constraint benchmark failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "run_id": run.run_id,
+                "artifact": str(artifact_path),
+                "case_count": run.metadata["case_count"],
+                "constraint_aggregates": [
+                    aggregate.model_dump(mode="json") for aggregate in aggregates
+                ],
             },
             indent=2,
             sort_keys=True,

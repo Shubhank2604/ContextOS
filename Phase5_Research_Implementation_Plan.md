@@ -902,9 +902,7 @@ or:
 ```python
 ValidationResult(
     passed=False,
-    violations=[
-        "missing_identifier: usr_72B91"
-    ],
+    violations=["missing_identifier: usr_72B91"],
 )
 ```
 
